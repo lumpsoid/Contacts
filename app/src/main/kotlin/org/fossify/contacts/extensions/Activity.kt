@@ -172,7 +172,7 @@ fun Activity.getDuplicateContacts(contact: Contact, includeCurrent: Boolean, cal
                     duplicateContacts.add(duplicate)
                 }
             }
-            if (!contact.isPrivate() && contact.contactId != 0) {
+            if (config.mergeDuplicateContacts && !contact.isPrivate() && contact.contactId != 0) {
                 val knownIds = duplicateContacts.map { it.id }.toMutableSet()
                 knownIds.add(contact.id)
                 ContactLinkHelper(this).getLinkedRawContactIds(contact.contactId)

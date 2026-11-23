@@ -34,6 +34,36 @@ class ContactLinkHelper(private val context: Context) {
         return ids
     }
 
+    fun getLinkedRawContactIdsOf(contacts: List<Contact>): List<Int> {
+        return contacts
+            .filter { !it.isPrivate() && it.contactId != 0 }
+            .flatMap { getLinkedRawContactIds(it.contactId) }
+            .distinct()
+    }
+
+    fun deleteRawContacts(rawIds: List<Int>): Boolean {
+        if (rawIds.isEmpty()) {
+            return true
+        }
+
+        val selection = "${RawContacts._ID} = ?"
+        val operations = rawIds.distinct().map {
+            ContentProviderOperation.newDelete(RawContacts.CONTENT_URI)
+                .withSelection(selection, arrayOf(it.toString()))
+                .build()
+        }
+
+        return try {
+            operations.chunked(BATCH_SIZE).forEach {
+                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(it))
+            }
+            true
+        } catch (e: Exception) {
+            context.showErrorToast(e)
+            false
+        }
+    }
+
     fun linkRawContacts(rawIds: List<Int>): Boolean {
         val ids = rawIds.distinct()
         val pairs = ids.drop(1).map { Pair(ids.first(), it) }
@@ -69,11 +99,6 @@ class ContactLinkHelper(private val context: Context) {
             false
         }
     }
-}
-
-/** True when both are device contacts aggregated into the same system contact. */
-fun Contact.isLinkedTo(other: Contact): Boolean {
-    return !isPrivate() && !other.isPrivate() && contactId != 0 && contactId == other.contactId
 }
 
 /** Keeps one row per system contact; private contacts and contacts without a contactId stay as they are. */

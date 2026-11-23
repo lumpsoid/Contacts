@@ -227,13 +227,20 @@ class ContactsAdapter(
 
         ContactsHelper(activity).getContacts(true) { allContacts ->
             ensureBackgroundThread {
+                val linkHelper = ContactLinkHelper(activity)
+                val linkedRawIds = if (config.mergeDuplicateContacts) {
+                    linkHelper.getLinkedRawContactIdsOf(contactsToRemove)
+                } else {
+                    emptyList()
+                }
+
                 ContactsHelper(activity).deleteContacts(contactsToRemove
                     .flatMap { contactToRemove -> allContacts.filter {
-                        val isSameOrDuplicate = (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
+                        (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
                             it.getHashToCompare() == contactToRemove.getHashToCompare()
-                        isSameOrDuplicate || (config.mergeDuplicateContacts && contactToRemove.isLinkedTo(it))
                     } }
                     .toMutableList() as ArrayList<Contact>)
+                linkHelper.deleteRawContacts(linkedRawIds)
 
                 activity.runOnUiThread {
                     if (contactItems.isEmpty()) {

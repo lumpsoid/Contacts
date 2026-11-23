@@ -883,17 +883,18 @@ class ViewContactActivity : ContactActivity() {
         ConfirmationDialog(this, message) {
             if (contact != null) {
                 val contactToDelete = contact!!
-                val linkedContacts = if (mergeDuplicate) {
-                    duplicateContacts.filter { contactToDelete.isLinkedTo(it) }
-                } else {
-                    emptyList()
-                }
-
-                ContactsHelper(this).deleteContact(contactToDelete, mergeDuplicate) {
-                    if (linkedContacts.isNotEmpty()) {
-                        ContactsHelper(this).deleteContacts(ArrayList(linkedContacts))
+                ensureBackgroundThread {
+                    val linkHelper = ContactLinkHelper(this)
+                    val linkedRawIds = if (mergeDuplicate) {
+                        linkHelper.getLinkedRawContactIdsOf(listOf(contactToDelete))
+                    } else {
+                        emptyList()
                     }
-                    finish()
+
+                    ContactsHelper(this).deleteContact(contactToDelete, mergeDuplicate) {
+                        linkHelper.deleteRawContacts(linkedRawIds)
+                        finish()
+                    }
                 }
             }
         }
