@@ -107,11 +107,16 @@ class ContactsAdapter(
             findItem(R.id.cab_delete).isVisible = location == LOCATION_CONTACTS_TAB || location == LOCATION_GROUP_CONTACTS
             findItem(R.id.cab_create_shortcut).isVisible =
                 isOreoPlus() && isOneItemSelected() && (location == LOCATION_FAVORITES_TAB || location == LOCATION_CONTACTS_TAB)
+            findItem(R.id.cab_link).isVisible = canLinkSelection()
 
             if (location == LOCATION_GROUP_CONTACTS) {
                 findItem(R.id.cab_remove).title = activity.getString(R.string.remove_from_group)
             }
         }
+    }
+
+    private fun canLinkSelection(): Boolean {
+        return selectedKeys.size > 1 && (location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB)
     }
 
     override fun actionItemPressed(id: Int) {
@@ -128,6 +133,7 @@ class ContactsAdapter(
             R.id.cab_send_sms_to_contacts -> sendSMSToContacts()
             R.id.cab_send_email_to_contacts -> sendEmailToContacts()
             R.id.cab_create_shortcut -> createShortcut()
+            R.id.cab_link -> linkContacts()
             R.id.cab_remove -> removeContacts()
             R.id.cab_delete -> askConfirmDelete()
         }
@@ -224,11 +230,20 @@ class ContactsAdapter(
 
         ContactsHelper(activity).getContacts(true) { allContacts ->
             ensureBackgroundThread {
+                val linkHelper = ContactLinkHelper(activity)
+                val linkedRawIds = if (config.mergeDuplicateContacts) {
+                    linkHelper.getLinkedRawContactIdsOf(contactsToRemove)
+                } else {
+                    emptyList()
+                }
+
                 ContactsHelper(activity).deleteContacts(contactsToRemove
                     .flatMap { contactToRemove -> allContacts.filter {
-                        (config.mergeDuplicateContacts || it.id == contactToRemove.id) && (it.getHashToCompare() == contactToRemove.getHashToCompare())
+                        (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
+                            it.getHashToCompare() == contactToRemove.getHashToCompare()
                     } }
                     .toMutableList() as ArrayList<Contact>)
+                linkHelper.deleteRawContacts(linkedRawIds)
 
                 activity.runOnUiThread {
                     if (contactItems.isEmpty()) {
@@ -267,6 +282,45 @@ class ContactsAdapter(
         ContactsHelper(activity).addFavorites(getSelectedItems())
         refreshListener?.refreshContacts(TAB_FAVORITES)
         finishActMode()
+    }
+
+    private fun linkContacts() {
+        val selected = getSelectedItems()
+        if (selected.size < 2) {
+            return
+        }
+
+        val privateCount = selected.count { it.isPrivate() }
+        val question = activity.getString(R.string.merge_private_contacts_confirmation)
+        when (privateCount) {
+            0 -> ensureBackgroundThread {
+                val linked = ContactLinkHelper(activity).linkRawContacts(selected.map { it.id })
+                activity.runOnUiThread {
+                    if (linked) {
+                        activity.toast(R.string.contacts_linked)
+                        refreshListener?.refreshContacts(TAB_CONTACTS or TAB_FAVORITES)
+                    }
+                    finishActMode()
+                }
+            }
+
+            selected.size -> ConfirmationDialog(activity, question) {
+                ensureBackgroundThread {
+                    val merged = PrivateContactMerger(activity).merge(selected)
+                    activity.runOnUiThread {
+                        if (merged) {
+                            activity.toast(R.string.contacts_merged)
+                        } else {
+                            activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+                        }
+                        refreshListener?.refreshContacts(ALL_TABS_MASK)
+                        finishActMode()
+                    }
+                }
+            }
+
+            else -> activity.toast(R.string.cannot_link_private_contacts)
+        }
     }
 
     private fun addToGroup() {

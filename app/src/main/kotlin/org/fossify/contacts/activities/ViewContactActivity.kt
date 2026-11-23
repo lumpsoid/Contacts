@@ -39,6 +39,7 @@ class ViewContactActivity : ContactActivity() {
     private var showFields = 0
     private var fullContact: Contact? = null    // contact with all fields filled from duplicates
     private var duplicateInitialized = false
+    private var linkedRawContactIds = listOf<Int>()
     private val mergeDuplicate: Boolean get() = config.mergeDuplicateContacts
     private val binding by viewBinding(ActivityViewContactBinding::inflate)
 
@@ -113,6 +114,11 @@ class ViewContactActivity : ContactActivity() {
 
             findItem(R.id.delete).setOnMenuItemClickListener {
                 deleteContactWithMergeLogic()
+                true
+            }
+
+            findItem(R.id.unlink).setOnMenuItemClickListener {
+                unlinkContact()
                 true
             }
 
@@ -242,6 +248,7 @@ class ViewContactActivity : ContactActivity() {
 
         updateTextColors(binding.contactScrollview)
         binding.contactToolbar.menu.findItem(R.id.open_with).isVisible = contact?.isPrivate() == false
+        updateUnlinkVisibility()
     }
 
     private fun setupViewContact() {
@@ -295,6 +302,40 @@ class ViewContactActivity : ContactActivity() {
         if (contact != null) {
             val uri = getContactPublicUri(contact!!)
             launchViewContactIntent(uri)
+        }
+    }
+
+    private fun updateUnlinkVisibility() {
+        val currentContact = contact
+        if (currentContact == null || currentContact.isPrivate() || currentContact.contactId == 0) {
+            linkedRawContactIds = emptyList()
+            binding.contactToolbar.menu.findItem(R.id.unlink).isVisible = false
+            return
+        }
+
+        ensureBackgroundThread {
+            val ids = ContactLinkHelper(this).getLinkedRawContactIds(currentContact.contactId)
+            runOnUiThread {
+                linkedRawContactIds = ids
+                binding.contactToolbar.menu.findItem(R.id.unlink).isVisible = ids.size > 1
+            }
+        }
+    }
+
+    private fun unlinkContact() {
+        val ids = linkedRawContactIds
+        if (ids.size < 2) {
+            return
+        }
+
+        ensureBackgroundThread {
+            val unlinked = ContactLinkHelper(this).unlinkRawContacts(ids)
+            runOnUiThread {
+                if (unlinked) {
+                    toast(R.string.contacts_unlinked)
+                    finish()
+                }
+            }
         }
     }
 
@@ -841,8 +882,19 @@ class ViewContactActivity : ContactActivity() {
         val message = "${getString(org.fossify.commons.R.string.proceed_with_deletion)}$addition"
         ConfirmationDialog(this, message) {
             if (contact != null) {
-                ContactsHelper(this).deleteContact(contact!!, mergeDuplicate) {
-                    finish()
+                val contactToDelete = contact!!
+                ensureBackgroundThread {
+                    val linkHelper = ContactLinkHelper(this)
+                    val linkedRawIds = if (mergeDuplicate) {
+                        linkHelper.getLinkedRawContactIdsOf(listOf(contactToDelete))
+                    } else {
+                        emptyList()
+                    }
+
+                    ContactsHelper(this).deleteContact(contactToDelete, mergeDuplicate) {
+                        linkHelper.deleteRawContacts(linkedRawIds)
+                        finish()
+                    }
                 }
             }
         }

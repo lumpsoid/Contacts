@@ -32,6 +32,7 @@ import org.fossify.contacts.helpers.AVOID_CHANGING_TEXT_TAG
 import org.fossify.contacts.helpers.AVOID_CHANGING_VISIBILITY_TAG
 import org.fossify.contacts.helpers.Config
 import org.fossify.contacts.helpers.GROUP
+import org.fossify.contacts.helpers.distinctByLinkedContact
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import java.util.Locale
 
@@ -132,6 +133,7 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
                 val contactSources = activity!!.getVisibleContactSources()
                 val favouriteContacts = contacts
                     .filter { it.starred == 1 && contactSources.contains(it.source) }
+                    .let { if (config.mergeDuplicateContacts) it.distinctByLinkedContact() else it }
 
                 if (activity!!.config.isCustomOrderSelected) {
                     sortFavourites(favouriteContacts)
@@ -143,6 +145,7 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
             else -> {
                 val contactSources = activity!!.getVisibleContactSources()
                 contacts.filter { contactSources.contains(it.source) }
+                    .let { if (config.mergeDuplicateContacts) it.distinctByLinkedContact() else it }
             }
         }
 
