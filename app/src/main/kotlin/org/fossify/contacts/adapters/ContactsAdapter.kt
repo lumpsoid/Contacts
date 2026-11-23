@@ -229,7 +229,9 @@ class ContactsAdapter(
             ensureBackgroundThread {
                 ContactsHelper(activity).deleteContacts(contactsToRemove
                     .flatMap { contactToRemove -> allContacts.filter {
-                        (config.mergeDuplicateContacts || it.id == contactToRemove.id) && (it.getHashToCompare() == contactToRemove.getHashToCompare())
+                        val isSameOrDuplicate = (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
+                            it.getHashToCompare() == contactToRemove.getHashToCompare()
+                        isSameOrDuplicate || (config.mergeDuplicateContacts && contactToRemove.isLinkedTo(it))
                     } }
                     .toMutableList() as ArrayList<Contact>)
 

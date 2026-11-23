@@ -33,6 +33,7 @@ import org.fossify.contacts.activities.EditContactActivity
 import org.fossify.contacts.activities.SimpleActivity
 import org.fossify.contacts.activities.ViewContactActivity
 import org.fossify.contacts.dialogs.ImportContactsDialog
+import org.fossify.contacts.helpers.ContactLinkHelper
 import org.fossify.contacts.helpers.DEFAULT_FILE_NAME
 import org.fossify.contacts.helpers.VcfExporter
 
@@ -170,6 +171,18 @@ fun Activity.getDuplicateContacts(contact: Contact, includeCurrent: Boolean, cal
                 if (duplicate != null) {
                     duplicateContacts.add(duplicate)
                 }
+            }
+            if (!contact.isPrivate() && contact.contactId != 0) {
+                val knownIds = duplicateContacts.map { it.id }.toMutableSet()
+                knownIds.add(contact.id)
+                ContactLinkHelper(this).getLinkedRawContactIds(contact.contactId)
+                    .filter { !knownIds.contains(it) }
+                    .forEach { rawId ->
+                        val linked = ContactsHelper(this).getContactWithId(rawId, false)
+                        if (linked != null && displayContactSources.contains(linked.source)) {
+                            duplicateContacts.add(linked)
+                        }
+                    }
             }
             callback(duplicateContacts)
         }

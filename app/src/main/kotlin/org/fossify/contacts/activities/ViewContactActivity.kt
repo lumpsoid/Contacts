@@ -882,7 +882,17 @@ class ViewContactActivity : ContactActivity() {
         val message = "${getString(org.fossify.commons.R.string.proceed_with_deletion)}$addition"
         ConfirmationDialog(this, message) {
             if (contact != null) {
-                ContactsHelper(this).deleteContact(contact!!, mergeDuplicate) {
+                val contactToDelete = contact!!
+                val linkedContacts = if (mergeDuplicate) {
+                    duplicateContacts.filter { contactToDelete.isLinkedTo(it) }
+                } else {
+                    emptyList()
+                }
+
+                ContactsHelper(this).deleteContact(contactToDelete, mergeDuplicate) {
+                    if (linkedContacts.isNotEmpty()) {
+                        ContactsHelper(this).deleteContacts(ArrayList(linkedContacts))
+                    }
                     finish()
                 }
             }
