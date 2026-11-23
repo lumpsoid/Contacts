@@ -95,6 +95,15 @@
     <string name="instant_messaging">Instant messaging (IM)</string>
     <string name="ringtone">Ringtone</string>
 
+    <!-- Linking -->
+    <string name="link_contacts">Link contacts</string>
+    <string name="unlink_contacts">Unlink contacts</string>
+    <string name="contacts_linked">Contacts linked</string>
+    <string name="contacts_unlinked">Contacts unlinked</string>
+    <string name="contacts_merged">Contacts merged</string>
+    <string name="merge_private_contacts_confirmation">These contacts are stored only in this app, so they will be merged into the first one and the others will be deleted. This cannot be undone. Continue?</string>
+    <string name="cannot_link_private_contacts">Contacts in phone storage (not visible by other apps) can only be merged with each other</string>
+
     <!-- Confirmation dialog -->
     <string name="delete_from_all_sources">The contact will be removed from all contact sources.</string>
 
