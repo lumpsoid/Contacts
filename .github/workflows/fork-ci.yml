@@ -1,0 +1,64 @@
+name: Fork CI
+
+# Runs the upstream PR checks and a debug build on every push to a work branch
+# of a fork, where pr.yml (pull_request only) never triggers. Skipped upstream.
+on:
+    push:
+        branches-ignore: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: fork-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    wrapper-validation:
+        if: github.repository != 'FossifyOrg/Contacts'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+            - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+
+    check:
+        needs: wrapper-validation
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                task: [":app:testFossDebugUnitTest", "detekt", "lint"]
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+            - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+              with:
+                  java-version: 17
+                  distribution: "temurin"
+            - uses: FossifyOrg/.github/.github/actions/gradle-cache@main
+            - name: Run ${{ matrix.task }}
+              run: ./gradlew ${{ matrix.task }}
+            - name: Upload lint results
+              if: ${{ matrix.task == 'lint' && !cancelled() }}
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+              with:
+                  name: "lint-results"
+                  path: "app/build/intermediates/lint_intermediate_text_report/fossDebug/lint-results-fossDebug.txt"
+
+    build:
+        needs: wrapper-validation
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+            - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+              with:
+                  java-version: 17
+                  distribution: "temurin"
+            - uses: FossifyOrg/.github/.github/actions/gradle-cache@main
+            - name: Build debug APK
+              run: ./gradlew assembleFossDebug
+            - name: Upload debug APK
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+              with:
+                  name: "foss-debug-apk"
+                  path: "app/build/outputs/apk/foss/debug/*debug.apk"
