@@ -107,13 +107,16 @@ class ContactsAdapter(
             findItem(R.id.cab_delete).isVisible = location == LOCATION_CONTACTS_TAB || location == LOCATION_GROUP_CONTACTS
             findItem(R.id.cab_create_shortcut).isVisible =
                 isOreoPlus() && isOneItemSelected() && (location == LOCATION_FAVORITES_TAB || location == LOCATION_CONTACTS_TAB)
-            findItem(R.id.cab_link).isVisible =
-                selectedKeys.size > 1 && (location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB)
+            findItem(R.id.cab_link).isVisible = canLinkSelection()
 
             if (location == LOCATION_GROUP_CONTACTS) {
                 findItem(R.id.cab_remove).title = activity.getString(R.string.remove_from_group)
             }
         }
+    }
+
+    private fun canLinkSelection(): Boolean {
+        return selectedKeys.size > 1 && (location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB)
     }
 
     override fun actionItemPressed(id: Int) {

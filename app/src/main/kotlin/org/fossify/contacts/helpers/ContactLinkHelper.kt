@@ -2,6 +2,8 @@ package org.fossify.contacts.helpers
 
 import android.content.ContentProviderOperation
 import android.content.Context
+import android.content.OperationApplicationException
+import android.os.RemoteException
 import android.provider.ContactsContract
 import android.provider.ContactsContract.AggregationExceptions
 import android.provider.ContactsContract.RawContacts
@@ -28,7 +30,9 @@ class ContactLinkHelper(private val context: Context) {
                     ids.add(it.getInt(0))
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: SecurityException) {
+            context.showErrorToast(e)
+        } catch (e: IllegalArgumentException) {
             context.showErrorToast(e)
         }
         return ids
@@ -53,15 +57,7 @@ class ContactLinkHelper(private val context: Context) {
                 .build()
         }
 
-        return try {
-            operations.chunked(BATCH_SIZE).forEach {
-                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(it))
-            }
-            true
-        } catch (e: Exception) {
-            context.showErrorToast(e)
-            false
-        }
+        return applyInBatches(operations)
     }
 
     fun linkRawContacts(rawIds: List<Int>): Boolean {
@@ -89,12 +85,22 @@ class ContactLinkHelper(private val context: Context) {
                 .build()
         }
 
+        return applyInBatches(operations)
+    }
+
+    private fun applyInBatches(operations: List<ContentProviderOperation>): Boolean {
         return try {
             operations.chunked(BATCH_SIZE).forEach {
                 context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ArrayList(it))
             }
             true
-        } catch (e: Exception) {
+        } catch (e: OperationApplicationException) {
+            context.showErrorToast(e)
+            false
+        } catch (e: RemoteException) {
+            context.showErrorToast(e)
+            false
+        } catch (e: SecurityException) {
             context.showErrorToast(e)
             false
         }
