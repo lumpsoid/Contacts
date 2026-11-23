@@ -32,6 +32,10 @@ fun mergeContactData(target: Contact, others: List<Contact>): Contact {
     fun pick(field: (Contact) -> String) = all.map(field).firstOrNull { it.isNotBlank() } ?: field(target)
 
     val photoHolder = all.firstOrNull { it.photo != null || it.photoUri.isNotEmpty() } ?: target
+    val nameHolder = all.firstOrNull { contact ->
+        listOf(contact.prefix, contact.firstName, contact.middleName, contact.surname, contact.suffix)
+            .any { it.isNotBlank() }
+    } ?: target
     val organizationHolder = all.firstOrNull {
         it.organization.company.isNotBlank() || it.organization.jobPosition.isNotBlank()
     } ?: target
@@ -44,11 +48,11 @@ fun mergeContactData(target: Contact, others: List<Contact>): Contact {
     }
 
     return target.copy(
-        prefix = pick { it.prefix },
-        firstName = pick { it.firstName },
-        middleName = pick { it.middleName },
-        surname = pick { it.surname },
-        suffix = pick { it.suffix },
+        prefix = nameHolder.prefix,
+        firstName = nameHolder.firstName,
+        middleName = nameHolder.middleName,
+        surname = nameHolder.surname,
+        suffix = nameHolder.suffix,
         nickname = pick { it.nickname },
         notes = pick { it.notes },
         photo = photoHolder.photo,
