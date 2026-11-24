@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.AlarmManagerCompat
 import androidx.core.content.FileProvider
 import org.fossify.commons.extensions.*
@@ -16,7 +18,9 @@ import org.fossify.contacts.BuildConfig
 import org.fossify.contacts.R
 import org.fossify.contacts.helpers.AUTOMATIC_BACKUP_REQUEST_CODE
 import org.fossify.contacts.helpers.Config
+import org.fossify.contacts.helpers.RawContactLoader
 import org.fossify.contacts.helpers.VcfExporter
+import org.fossify.contacts.helpers.addNamelessContacts
 import org.fossify.contacts.helpers.getNextAutoBackupTime
 import org.fossify.contacts.helpers.getPreviousAutoBackupTime
 import org.fossify.contacts.receivers.AutomaticBackupReceiver
@@ -158,4 +162,26 @@ fun Context.copyUriToTempFile(uri: Uri, name: String): File? {
     }
 
     return tempFile
+}
+
+/** Commons getContactWithId misses device raw contacts without a name or organization row; load those too. */
+fun Context.getContactWithIdOrRaw(id: Int, isPrivate: Boolean): Contact? {
+    val contact = ContactsHelper(this).getContactWithId(id, isPrivate)
+    return if (contact != null || isPrivate) contact else RawContactLoader(this).getContact(id)
+}
+
+/** Commons getContacts, plus the device raw contacts it skips for having no name or organization row. */
+fun Context.getContactsWithNameless(callback: (ArrayList<Contact>) -> Unit) {
+    ContactsHelper(this).getContacts { contacts ->
+        ensureBackgroundThread {
+            val result = addNamelessContacts(
+                listed = contacts,
+                nameless = RawContactLoader(this).getNamelessContacts(),
+                mergeLinked = config.mergeDuplicateContacts,
+                onlyWithNumbers = config.showOnlyContactsWithNumbers
+            )
+            result.sort()
+            Handler(Looper.getMainLooper()).post { callback(result) }
+        }
+    }
 }

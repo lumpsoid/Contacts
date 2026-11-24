@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added unlinking of linked contacts from the contact details screen
 - Added merging of contacts stored in phone storage (not visible by other apps)
 
+### Fixed
+- Fixed contacts without a name (for example, only a phone number) not showing in the list or on a linked contact
+
 ## [1.6.0] - 2026-01-30
 ### Added
 - Added support for custom fonts

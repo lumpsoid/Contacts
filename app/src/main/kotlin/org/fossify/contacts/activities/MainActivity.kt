@@ -27,6 +27,7 @@ import org.fossify.contacts.databinding.ActivityMainBinding
 import org.fossify.contacts.dialogs.ChangeSortingDialog
 import org.fossify.contacts.dialogs.FilterContactSourcesDialog
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.extensions.getContactsWithNameless
 import org.fossify.contacts.extensions.handleGenericContactClick
 import org.fossify.contacts.extensions.tryImportContactsFromFile
 import org.fossify.contacts.fragments.FavoritesFragment
@@ -487,10 +488,10 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             binding.viewPager.currentItem = getDefaultTab()
         }
 
-        ContactsHelper(this).getContacts { contacts ->
+        getContactsWithNameless { contacts ->
             isGettingContacts = false
             if (isDestroyed || isFinishing) {
-                return@getContacts
+                return@getContactsWithNameless
             }
 
             if (refreshTabsMask and TAB_CONTACTS != 0) {
