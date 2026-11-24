@@ -17,11 +17,18 @@ fun keptSeparateIds(group: List<Contact>, keptSeparate: Set<Pair<Int, Int>>): Se
 
 /**
  * Commons' merge of contacts with the same name, except that device raw contacts the system
- * keeps apart (see [keptSeparateIds]) each keep their own row. The result is not sorted.
+ * keeps apart (see [keptSeparateIds]) each keep their own row. Only contacts of [visibleSources] are
+ * merged and returned. Groups are taken from all of [contacts], so a visible row gets the groups commons
+ * put on a hidden-source row of its system contact. The result is not sorted.
  */
-fun mergeDuplicatesByName(contacts: List<Contact>, keptSeparate: Set<Pair<Int, Int>>): ArrayList<Contact> {
+fun mergeDuplicatesByName(
+    contacts: List<Contact>,
+    keptSeparate: Set<Pair<Int, Int>>,
+    visibleSources: Collection<String>
+): ArrayList<Contact> {
     val result = ArrayList<Contact>()
-    contacts.groupBy { it.getNameToDisplay().lowercase(Locale.getDefault()) }.values.forEach { group ->
+    val visible = contacts.filter { visibleSources.contains(it.source) }
+    visible.groupBy { it.getNameToDisplay().lowercase(Locale.getDefault()) }.values.forEach { group ->
         val separate = keptSeparateIds(group, keptSeparate)
         val (apart, together) = group.partition { !it.isPrivate() && separate.contains(it.id) }
         result.addAll(apart)

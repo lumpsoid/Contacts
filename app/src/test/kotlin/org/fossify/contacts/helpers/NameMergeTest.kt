@@ -32,7 +32,8 @@ class NameMergeTest {
     fun sameNameContactsMergeWithoutPairs() {
         val result = mergeDuplicatesByName(
             contacts = listOf(device(ID_A, CONTACT_A), device(ID_B, CONTACT_B, "ann")),
-            keptSeparate = emptySet()
+            keptSeparate = emptySet(),
+            visibleSources = VISIBLE
         )
         assertEquals(1, result.size)
         // Equal-length compare strings: the stable sort keeps the first input.
@@ -43,7 +44,8 @@ class NameMergeTest {
     fun keptSeparateSameNameContactsStayApart() {
         val result = mergeDuplicatesByName(
             contacts = listOf(device(ID_A, CONTACT_A), device(ID_B, CONTACT_B)),
-            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B))
+            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B)),
+            visibleSources = VISIBLE
         )
         assertEquals(listOf(ID_A, ID_B), ids(result).sorted())
     }
@@ -63,7 +65,8 @@ class NameMergeTest {
                 device(ID_C, CONTACT_C),
                 device(ID_D, CONTACT_D)
             ),
-            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B))
+            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B)),
+            visibleSources = VISIBLE
         )
         val resultIds = ids(result).sorted()
         assertEquals(3, resultIds.size)
@@ -79,7 +82,8 @@ class NameMergeTest {
                 device(ID_B, CONTACT_B, "Bob"),
                 device(ID_C, CONTACT_C, "Ann")
             ),
-            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B))
+            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B)),
+            visibleSources = VISIBLE
         )
         assertEquals(2, result.size)
         assertEquals(listOf(ID_A, ID_B), ids(result).sorted())
@@ -93,7 +97,8 @@ class NameMergeTest {
                 privateContact(ID_B),
                 device(ID_C, CONTACT_C)
             ),
-            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B))
+            keptSeparate = setOf(keptSeparatePair(ID_A, ID_B)),
+            visibleSources = VISIBLE
         )
         assertEquals(1, result.size)
     }
@@ -105,7 +110,8 @@ class NameMergeTest {
                 device(ID_A, CONTACT_A),
                 device(ID_B, CONTACT_B, mimetype = LONG_MIMETYPE)
             ),
-            keptSeparate = emptySet()
+            keptSeparate = emptySet(),
+            visibleSources = VISIBLE
         )
         assertEquals(listOf(ID_B), ids(result))
     }
@@ -117,7 +123,8 @@ class NameMergeTest {
         }
         val result = mergeDuplicatesByName(
             contacts = listOf(withGroups, device(ID_B, CONTACT_A, mimetype = LONG_MIMETYPE)),
-            keptSeparate = emptySet()
+            keptSeparate = emptySet(),
+            visibleSources = VISIBLE
         )
         val kept = result.single()
         assertEquals(ID_B, kept.id)
@@ -131,11 +138,31 @@ class NameMergeTest {
         }
         val result = mergeDuplicatesByName(
             contacts = listOf(withGroups, device(ID_B, CONTACT_A, "Bob")),
-            keptSeparate = emptySet()
+            keptSeparate = emptySet(),
+            visibleSources = VISIBLE
         )
         assertEquals(2, result.size)
         assertEquals(listOf(ID_A), ids(result.filter { it.groups.isNotEmpty() }))
         assertTrue(result.single { it.id == ID_B }.groups.isEmpty())
+    }
+
+    @Test
+    fun visibleRowTakesGroupsFromHiddenRowOfSameContact() {
+        val hidden = device(ID_A, CONTACT_A).apply {
+            source = "hidden"
+            groups = arrayListOf(Group(1L, "Family"))
+        }
+        val visible = device(ID_B, CONTACT_A, "Ann")
+        val result = mergeDuplicatesByName(listOf(hidden, visible), emptySet(), setOf("acc"))
+        assertEquals(listOf(ID_B), ids(result))
+        assertEquals(listOf("Family"), result.single().groups.map { it.title })
+    }
+
+    @Test
+    fun hiddenContactsAreLeftOut() {
+        val hidden = device(ID_A, CONTACT_A, "Zed").apply { source = "hidden" }
+        val result = mergeDuplicatesByName(listOf(hidden, device(ID_B, CONTACT_B)), emptySet(), setOf("acc"))
+        assertEquals(listOf(ID_B), ids(result))
     }
 
     @Test

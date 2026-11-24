@@ -42,8 +42,9 @@ fun Context.getContactsWithNameless(
             val listed = if (mergeByName) {
                 val visibleSources = getVisibleContactSources()
                 mergeDuplicatesByName(
-                    contacts.filter { visibleSources.contains(it.source) },
-                    ContactLinkHelper(this).getKeptSeparatePairs()
+                    contacts,
+                    ContactLinkHelper(this).getKeptSeparatePairs(),
+                    visibleSources
                 )
             } else {
                 contacts
