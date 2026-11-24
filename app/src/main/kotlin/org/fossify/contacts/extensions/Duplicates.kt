@@ -1,6 +1,7 @@
 package org.fossify.contacts.extensions
 
 import android.content.Context
+import org.fossify.commons.extensions.getVisibleContactSources
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.contacts.helpers.ContactLinkHelper
@@ -17,7 +18,14 @@ fun Context.getDuplicatesKeptTogether(contact: Contact, addOriginal: Boolean, ca
             if (addOriginal) {
                 result.add(contact)
             }
-            result.addAll(withoutKeptSeparate(contact, duplicates, ContactLinkHelper(this).getKeptSeparatePairs()))
+            result.addAll(
+                withoutKeptSeparate(
+                    contact,
+                    duplicates,
+                    ContactLinkHelper(this).getKeptSeparatePairs(),
+                    getVisibleContactSources()
+                )
+            )
             callback(result)
         }
     }

@@ -17,6 +17,7 @@ class NameMergeTest {
         private const val CONTACT_C = 31
         private const val CONTACT_D = 32
         private const val LONG_MIMETYPE = "vnd.long.mimetype"
+        private val VISIBLE = setOf("acc", "smt_private")
     }
 
     private fun device(id: Int, contactId: Int, name: String = "Ann", mimetype: String = "") =
@@ -145,10 +146,10 @@ class NameMergeTest {
         val b = device(ID_B, CONTACT_B)
         val c = device(ID_C, CONTACT_C)
         val d = device(ID_D, CONTACT_D)
-        val withPair = withoutKeptSeparate(a, listOf(b, c, d), setOf(keptSeparatePair(ID_B, ID_C)))
+        val withPair = withoutKeptSeparate(a, listOf(b, c, d), setOf(keptSeparatePair(ID_B, ID_C)), VISIBLE)
         assertEquals(listOf(ID_D), ids(withPair))
 
-        val withoutPair = withoutKeptSeparate(a, listOf(b, c, d), emptySet())
+        val withoutPair = withoutKeptSeparate(a, listOf(b, c, d), emptySet(), VISIBLE)
         assertEquals(listOf(ID_B, ID_C, ID_D), ids(withoutPair))
     }
 
@@ -157,7 +158,7 @@ class NameMergeTest {
         val a = device(ID_A, CONTACT_A)
         val b = device(ID_B, CONTACT_B)
         val c = device(ID_C, CONTACT_C)
-        val result = withoutKeptSeparate(a, listOf(b, c), setOf(keptSeparatePair(ID_A, ID_B)))
+        val result = withoutKeptSeparate(a, listOf(b, c), setOf(keptSeparatePair(ID_A, ID_B)), VISIBLE)
         assertEquals(emptyList<Int>(), ids(result))
     }
 
@@ -167,8 +168,23 @@ class NameMergeTest {
         val result = withoutKeptSeparate(
             a,
             listOf(private(ID_B), device(ID_C, CONTACT_C)),
-            setOf(keptSeparatePair(ID_A, ID_B))
+            setOf(keptSeparatePair(ID_A, ID_B)),
+            VISIBLE
         )
         assertEquals(listOf(ID_B, ID_C), ids(result))
+    }
+
+    @Test
+    fun hiddenSourcePairDoesNotSplitVisibleDuplicates() {
+        val a = device(ID_A, CONTACT_A)
+        val b = device(ID_B, CONTACT_B)
+        val hidden = device(ID_C, CONTACT_C).apply { source = "hidden" }
+        val pairs = setOf(keptSeparatePair(ID_A, ID_C))
+        val result = withoutKeptSeparate(a, listOf(b, hidden), pairs, setOf("acc"))
+        assertEquals(listOf(ID_B), ids(result))
+
+        // Positive control: with the hidden source visible, the pair isolates A and nothing is merged.
+        val allVisible = withoutKeptSeparate(a, listOf(b, hidden), pairs, setOf("acc", "hidden"))
+        assertEquals(emptyList<Int>(), ids(allVisible))
     }
 }

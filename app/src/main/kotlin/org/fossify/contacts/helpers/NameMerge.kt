@@ -45,12 +45,23 @@ fun mergeDuplicatesByName(contacts: List<Contact>, keptSeparate: Set<Pair<Int, I
 }
 
 /**
- * The name duplicates of [contact] that merge with it, by the same rule as [mergeDuplicatesByName].
+ * The name duplicates of [contact] that merge with it, by the same rule as [mergeDuplicatesByName] over the
+ * contacts of [visibleSources]. A hidden duplicate kept apart from [contact] itself is left out too.
  */
-fun withoutKeptSeparate(contact: Contact, duplicates: List<Contact>, keptSeparate: Set<Pair<Int, Int>>): List<Contact> {
-    val separate = keptSeparateIds(duplicates + contact, keptSeparate)
+fun withoutKeptSeparate(
+    contact: Contact,
+    duplicates: List<Contact>,
+    keptSeparate: Set<Pair<Int, Int>>,
+    visibleSources: Collection<String>
+): List<Contact> {
+    val separate = keptSeparateIds((duplicates + contact).filter { visibleSources.contains(it.source) }, keptSeparate)
     if (!contact.isPrivate() && separate.contains(contact.id)) {
         return emptyList()
     }
-    return duplicates.filter { it.isPrivate() || !separate.contains(it.id) }
+    return duplicates.filter {
+        it.isPrivate() || (!separate.contains(it.id) && !isKeptApart(contact, it, keptSeparate))
+    }
 }
+
+private fun isKeptApart(first: Contact, second: Contact, keptSeparate: Set<Pair<Int, Int>>) =
+    !first.isPrivate() && !second.isPrivate() && keptSeparate.contains(keptSeparatePair(first.id, second.id))
