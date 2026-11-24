@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/activity_margin"
+            android:paddingTop="@dimen/big_margin"
+            android:paddingEnd="@dimen/activity_margin"
+            android:paddingBottom="@dimen/activity_margin">
+
+            <ImageView
+                android:id="@+id/dedupe_result_icon"
+                android:layout_width="@dimen/normal_icon_size"
+                android:layout_height="@dimen/normal_icon_size"
+                android:importantForAccessibility="no" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/dedupe_result_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/activity_margin"
+                android:gravity="center"
+                android:textSize="@dimen/extra_big_text_size"
+                android:textStyle="bold" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/dedupe_result_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/small_margin"
+                android:alpha="0.7"
+                android:gravity="center"
+                android:textSize="@dimen/bigger_text_size" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/dedupe_result_stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/activity_margin"
+            android:paddingEnd="@dimen/activity_margin">
+
+            <include
+                android:id="@+id/dedupe_result_merged"
+                layout="@layout/item_dedupe_stat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <include
+                android:id="@+id/dedupe_result_failed"
+                layout="@layout/item_dedupe_stat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/medium_margin"
+                android:layout_weight="1" />
+
+            <include
+                android:id="@+id/dedupe_result_skipped"
+                layout="@layout/item_dedupe_stat"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/medium_margin"
+                android:layout_weight="1" />
+
+        </LinearLayout>
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/dedupe_result_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/medium_margin"
+            android:alpha="0.7"
+            android:paddingStart="@dimen/settings_label_start_margin"
+            android:paddingEnd="@dimen/settings_label_start_margin"
+            android:text="@string/dedupe_cancelled"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/dedupe_result_failures_label"
+            style="@style/SettingsSectionLabelStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dedupe_result_not_merged"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/dedupe_result_failures"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/dedupe_result_backup_label"
+            style="@style/SettingsSectionLabelStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dedupe_result_backup"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/dedupe_result_backup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/settings_label_start_margin"
+            android:paddingEnd="@dimen/settings_label_start_margin"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/dedupe_result_backup_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_save_vector" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/dedupe_result_backup_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/activity_margin"
+                android:layout_weight="1"
+                android:text="@string/dedupe_backup_saved" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/dedupe_open_backup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/dedupe_open_backup" />
+
+        </LinearLayout>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="@dimen/big_margin" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dedupe_done"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_margin"
+            android:text="@string/dedupe_done" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -117,36 +117,12 @@
             android:visibility="gone"
             app:layoutManager="org.fossify.commons.views.MyLinearLayoutManager" />
 
-        <LinearLayout
-            android:id="@+id/dedupe_result_holder"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/activity_margin"
-            android:visibility="gone">
-
-            <org.fossify.commons.views.MyTextView
-                android:id="@+id/dedupe_result_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/dedupe_open_backup"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/dedupe_open_backup"
-                android:visibility="gone" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/dedupe_done"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/dedupe_done" />
-
-        </LinearLayout>
+        <include
+            android:id="@+id/dedupe_result"
+            layout="@layout/view_dedupe_result"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
 
     </RelativeLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

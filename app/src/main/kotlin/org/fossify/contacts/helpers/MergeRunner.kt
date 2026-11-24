@@ -36,7 +36,7 @@ class MergeRunner(private val context: Context) {
             outcomes.add(mergeSafely(writer, plan, destination, access))
             onProgress(outcomes.size, plans.size)
         }
-        return MergeRunResult.Finished(outcomes, backupUri, cancelled = outcomes.size < plans.size)
+        return MergeRunResult.Finished(outcomes, backupUri, total = plans.size)
     }
 
     /** Merges [plan]; an unexpected error fails only this plan, so the rest of the run goes on. */
