@@ -1,0 +1,55 @@
+package org.fossify.contacts.helpers
+
+import android.content.ContentResolver
+import android.content.Context
+import android.provider.ContactsContract
+import org.fossify.commons.extensions.getPrivateContactSource
+import org.fossify.commons.extensions.getVisibleContactSources
+import org.fossify.commons.helpers.ContactsHelper
+import org.fossify.commons.helpers.SMT_PRIVATE
+import org.fossify.commons.helpers.ensureBackgroundThread
+import org.fossify.commons.models.contacts.Contact
+import org.fossify.commons.models.contacts.ContactSource
+import org.fossify.contacts.extensions.getContactsWithNameless
+import org.fossify.contacts.models.AccountAccess
+import org.fossify.contacts.models.MergeRecord
+import org.fossify.contacts.models.ScanResult
+
+/** Loads the visible contact records with their account access and scans them for duplicates. */
+class DuplicateScanner(private val context: Context) {
+    /** [callback] runs on a background thread. */
+    fun scan(callback: (ScanResult) -> Unit) {
+        context.getContactsWithNameless(
+            getAll = true,
+            ignoredContactSources = HashSet(),
+            showOnlyContactsWithNumbers = false
+        ) { contacts ->
+            ensureBackgroundThread {
+                val records = toRecords(contacts)
+                val keptSeparate = ContactLinkHelper(context).getKeptSeparatePairs()
+                callback(scanDuplicates(records, keptSeparate, context.getVisibleContactSources()))
+            }
+        }
+    }
+
+    /** Accounts this app can save into, the private phone storage included, with their access. Blocking. */
+    fun writableSources(): List<Pair<ContactSource, AccountAccess>> {
+        val readOnly = readOnlyAdapterTypes()
+        val sources = ContactsHelper(context).getDeviceContactSources() + context.getPrivateContactSource()
+        return sources.map { it to AccountAccess.of(it.type, readOnly) }.filter { it.second.isWritable() }
+    }
+
+    private fun toRecords(contacts: List<Contact>): List<MergeRecord> {
+        val types = ContactsHelper(context).getDeviceContactSources().associate { it.name to it.type }
+        val readOnly = readOnlyAdapterTypes()
+        return contacts.map { contact ->
+            val type = if (contact.isPrivate()) SMT_PRIVATE else types[contact.source] ?: ""
+            MergeRecord(contact, type, AccountAccess.of(type, readOnly))
+        }
+    }
+
+    private fun readOnlyAdapterTypes(): Set<String> = ContentResolver.getSyncAdapterTypes()
+        .filter { it.authority == ContactsContract.AUTHORITY && !it.supportsUploading() }
+        .map { it.accountType }
+        .toSet()
+}
