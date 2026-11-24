@@ -366,7 +366,11 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun exportContactsTo(ignoredContactSources: HashSet<String>, outputStream: OutputStream?) {
-        getContactsWithNameless(getAll = true, ignoredContactSources = ignoredContactSources) { contacts ->
+        getContactsWithNameless(
+            getAll = true,
+            ignoredContactSources = ignoredContactSources,
+            showOnlyContactsWithNumbers = false
+        ) { contacts ->
             if (contacts.isEmpty()) {
                 toast(org.fossify.commons.R.string.no_entries_for_exporting)
             } else {

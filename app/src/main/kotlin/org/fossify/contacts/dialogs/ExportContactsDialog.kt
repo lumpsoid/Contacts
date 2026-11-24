@@ -49,7 +49,7 @@ class ExportContactsDialog(
                 processDataIfReady(this)
             }
 
-            activity.getContactsWithNameless(getAll = true) { contacts ->
+            activity.getContactsWithNameless(getAll = true, showOnlyContactsWithNumbers = false) { contacts ->
                 contacts.mapTo(this@ExportContactsDialog.contacts) { it.copy() }
                 isContactsReady = true
                 processDataIfReady(this)

@@ -52,7 +52,7 @@ class ManageAutoBackupsDialog(private val activity: SimpleActivity, onSuccess: (
                 processDataIfReady(this)
             }
 
-            activity.getContactsWithNameless(getAll = true) { receivedContacts ->
+            activity.getContactsWithNameless(getAll = true, showOnlyContactsWithNumbers = false) { receivedContacts ->
                 contacts = receivedContacts
                 isContactsReady = true
                 processDataIfReady(this)

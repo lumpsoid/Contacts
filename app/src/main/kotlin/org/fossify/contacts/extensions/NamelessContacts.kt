@@ -18,19 +18,23 @@ fun Context.getContactWithIdOrRaw(id: Int, isPrivate: Boolean): Contact? {
     return if (contact != null || isPrivate) contact else RawContactLoader(this).getContact(id)
 }
 
-/** Commons getContacts, plus the device raw contacts it skips for having no name or organization row. */
+/**
+ * Commons getContacts, plus the device raw contacts it skips for having no name or organization row.
+ * Backups and exports pass showOnlyContactsWithNumbers = false so the list setting never drops contacts from them.
+ */
 fun Context.getContactsWithNameless(
     getAll: Boolean = false,
     ignoredContactSources: HashSet<String> = HashSet(),
+    showOnlyContactsWithNumbers: Boolean = config.showOnlyContactsWithNumbers,
     callback: (ArrayList<Contact>) -> Unit
 ) {
-    ContactsHelper(this).getContacts(getAll, false, ignoredContactSources) { contacts ->
+    ContactsHelper(this).getContacts(getAll, false, ignoredContactSources, showOnlyContactsWithNumbers) { contacts ->
         ensureBackgroundThread {
             val rules = namelessRules(
                 getAll = getAll,
                 ignoredContactSources = ignoredContactSources,
                 mergeDuplicates = config.mergeDuplicateContacts,
-                showOnlyWithNumbers = config.showOnlyContactsWithNumbers
+                showOnlyWithNumbers = showOnlyContactsWithNumbers
             )
             val namelessIgnored = if (getAll) ignoredContactSources else baseConfig.ignoredContactSources
             val result = addNamelessContacts(

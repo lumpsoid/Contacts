@@ -79,7 +79,7 @@ fun Context.backupContacts() {
     require(isRPlus())
     ensureBackgroundThread {
         val config = config
-        getContactsWithNameless(getAll = true) { contacts ->
+        getContactsWithNameless(getAll = true, showOnlyContactsWithNumbers = false) { contacts ->
             val contactsToBackup = contacts.filter { it.source in config.autoBackupContactSources }
             if (contactsToBackup.isEmpty()) {
                 toast(org.fossify.commons.R.string.no_entries_for_exporting)
