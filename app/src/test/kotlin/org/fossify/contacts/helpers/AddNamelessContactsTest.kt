@@ -144,4 +144,15 @@ class AddNamelessContactsTest {
         )
         assertEquals(listOf(ID_A, ID_B), ids(result))
     }
+
+    @Test
+    fun namelessWithoutSystemContactIsKeptWhenMerging() {
+        val result = addNamelessContacts(
+            listed = listOf(named(ID_A, CONTACT_A)),
+            nameless = listOf(phoneOnly(ID_B, 0), phoneOnly(ID_C, 0)),
+            mergeLinked = true,
+            onlyWithNumbers = false
+        )
+        assertEquals(listOf(ID_A, ID_B, ID_C), ids(result))
+    }
 }
