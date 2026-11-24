@@ -125,7 +125,7 @@ import org.fossify.contacts.dialogs.SelectGroupsDialog
 import org.fossify.contacts.extensions.config
 import org.fossify.contacts.extensions.getCachePhotoUri
 import org.fossify.contacts.extensions.getContactWithIdOrRaw
-import org.fossify.contacts.extensions.getDuplicatesOfContactWithNameless
+import org.fossify.contacts.extensions.getDuplicatesKeptTogether
 import org.fossify.contacts.extensions.showContactSourcePicker
 import org.fossify.contacts.helpers.ADD_NEW_CONTACT_NUMBER
 import org.fossify.contacts.helpers.IS_FROM_SIMPLE_CONTACTS
@@ -1433,7 +1433,7 @@ class EditContactActivity : ContactActivity() {
     ) {
         val contactsHelper = ContactsHelper(this)
 
-        getDuplicatesOfContactWithNameless(contact!!) { contacts ->
+        getDuplicatesKeptTogether(contact!!, false) { contacts ->
             ensureBackgroundThread {
                 val displayContactSources = getVisibleContactSources()
                 contacts.filter { displayContactSources.contains(it.source) }.forEach { contact ->
