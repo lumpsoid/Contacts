@@ -1,0 +1,56 @@
+name: Fork release build
+
+# Builds a signed foss release APK on demand, signed with the fork's own key
+# (repo secrets), so builds install over each other. Skipped upstream.
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    wrapper-validation:
+        if: github.repository != 'FossifyOrg/Contacts'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+            - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+
+    build:
+        needs: wrapper-validation
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+            - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+              with:
+                  java-version: 17
+                  distribution: "temurin"
+            - uses: FossifyOrg/.github/.github/actions/gradle-cache@main
+
+            - name: Set build version
+              id: version
+              run: |
+                  VERSION_NAME=$(grep '^VERSION_NAME=' gradle.properties | cut -d= -f2)
+                  echo "version=${VERSION_NAME}-fork-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+            - name: Decode signing secrets
+              uses: FossifyOrg/.github/.github/actions/decode-secrets@main
+              env:
+                  KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+                  KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+                  KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+                  KEYSTORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+
+            - name: Build release APK
+              run: ./gradlew -PVERSION_NAME="${{ steps.version.outputs.version }}" assembleFossRelease
+
+            - name: Clean up secrets
+              if: always()
+              uses: FossifyOrg/.github/.github/actions/cleanup-secrets@main
+
+            - name: Upload release APK
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+              with:
+                  name: "contacts-fork-release-${{ steps.version.outputs.version }}"
+                  path: "app/build/outputs/apk/foss/release/*release.apk"
+                  if-no-files-found: error

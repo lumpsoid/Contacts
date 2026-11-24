@@ -118,7 +118,7 @@ android {
         )
     }
 
-    namespace = project.property("APP_ID").toString()
+    namespace = "org.fossify.contacts"
 
     lint {
         checkReleaseBuilds = false
