@@ -18,6 +18,7 @@ import org.fossify.contacts.dialogs.ManageVisibleFieldsDialog
 import org.fossify.contacts.dialogs.ManageVisibleTabsDialog
 import org.fossify.contacts.extensions.*
 import org.fossify.contacts.helpers.VcfExporter
+import java.io.IOException
 import java.io.OutputStream
 import java.util.Locale
 import kotlin.system.exitProcess
@@ -378,23 +379,36 @@ class SettingsActivity : SimpleActivity() {
             ignoredContactSources = ignoredContactSources,
             showOnlyContactsWithNumbers = false
         ) { contacts ->
-            if (contacts.isEmpty()) {
+            val isEmpty = contacts.isEmpty()
+            var result = VcfExporter.ExportResult.EXPORT_FAIL
+            try {
+                outputStream.use { stream ->
+                    if (!isEmpty) {
+                        VcfExporter().exportContacts(
+                            context = this,
+                            outputStream = stream,
+                            contacts = contacts,
+                            showExportingToast = true
+                        ) { result = it }
+                    }
+                }
+            } catch (e: IOException) {
+                showErrorToast(e)
+                result = VcfExporter.ExportResult.EXPORT_FAIL
+            }
+
+            if (isEmpty) {
                 toast(org.fossify.commons.R.string.no_entries_for_exporting)
             } else {
-                VcfExporter().exportContacts(
-                    context = this,
-                    outputStream = outputStream,
-                    contacts = contacts,
-                    showExportingToast = true
-                ) { result ->
-                    toast(
-                        when (result) {
-                            VcfExporter.ExportResult.EXPORT_OK -> org.fossify.commons.R.string.exporting_successful
-                            VcfExporter.ExportResult.EXPORT_PARTIAL -> org.fossify.commons.R.string.exporting_some_entries_failed
-                            else -> org.fossify.commons.R.string.exporting_failed
-                        }
-                    )
-                }
+                toast(
+                    when (result) {
+                        VcfExporter.ExportResult.EXPORT_OK ->
+                            org.fossify.commons.R.string.exporting_successful
+                        VcfExporter.ExportResult.EXPORT_PARTIAL ->
+                            org.fossify.commons.R.string.exporting_some_entries_failed
+                        else -> org.fossify.commons.R.string.exporting_failed
+                    }
+                )
             }
         }
     }

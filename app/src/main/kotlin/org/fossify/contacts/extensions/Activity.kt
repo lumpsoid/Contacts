@@ -36,6 +36,7 @@ import org.fossify.contacts.dialogs.ImportContactsDialog
 import org.fossify.contacts.helpers.ContactLinkHelper
 import org.fossify.contacts.helpers.DEFAULT_FILE_NAME
 import org.fossify.contacts.helpers.VcfExporter
+import java.io.IOException
 
 fun SimpleActivity.startCallIntent(recipient: String) {
     handlePermission(PERMISSION_CALL_PHONE) {
@@ -82,18 +83,26 @@ fun BaseSimpleActivity.shareContacts(contacts: ArrayList<Contact>) {
         return
     }
 
-    getFileOutputStream(file.toFileDirItem(this), true) {
-        VcfExporter().exportContacts(
-            context = this,
-            outputStream = it,
-            contacts = contacts,
-            showExportingToast = false
-        ) {
-            if (it == VcfExporter.ExportResult.EXPORT_OK) {
-                sharePathIntent(file.absolutePath, BuildConfig.APPLICATION_ID)
-            } else {
-                showErrorToast("$it")
+    getFileOutputStream(file.toFileDirItem(this), true) { outputStream ->
+        var result = VcfExporter.ExportResult.EXPORT_FAIL
+        try {
+            outputStream.use { stream ->
+                VcfExporter().exportContacts(
+                    context = this,
+                    outputStream = stream,
+                    contacts = contacts,
+                    showExportingToast = false
+                ) { result = it }
             }
+        } catch (e: IOException) {
+            showErrorToast(e)
+            result = VcfExporter.ExportResult.EXPORT_FAIL
+        }
+
+        if (result == VcfExporter.ExportResult.EXPORT_OK) {
+            sharePathIntent(file.absolutePath, BuildConfig.APPLICATION_ID)
+        } else {
+            showErrorToast("$result")
         }
     }
 }
