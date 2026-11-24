@@ -89,4 +89,17 @@ class NamelessRulesTest {
         val result = namelessDuplicatesOf(contact, nameless)
         assertEquals(emptyList<Int>(), ids(result))
     }
+
+    @Test
+    fun privateContactMatchesNamelessWithSameId() {
+        val contact = Contact(
+            id = ID_SELF,
+            contactId = 0,
+            source = "smt_private",
+            phoneNumbers = arrayListOf(PhoneNumber(NUMBER_A, 2, "", NUMBER_A))
+        )
+        val nameless = listOf(phoneOnly(ID_SELF, NUMBER_A))
+        val result = namelessDuplicatesOf(contact, nameless)
+        assertEquals(listOf(ID_SELF), ids(result))
+    }
 }

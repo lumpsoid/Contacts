@@ -206,10 +206,13 @@ fun namelessRules(
     onlyWithNumbers = showOnlyWithNumbers && ignoredContactSources.isEmpty()
 )
 
-/** The nameless contacts commons getDuplicatesOfContact would call duplicates of [contact], if it could load them. */
+/**
+ * The nameless contacts commons getDuplicatesOfContact would call duplicates of [contact], if it could load them.
+ * Private contacts have their own id space, so only a device contact is excluded by id.
+ */
 fun namelessDuplicatesOf(contact: Contact, nameless: List<Contact>): List<Contact> {
     val hash = contact.getHashToCompare()
-    return nameless.filter { it.id != contact.id && it.getHashToCompare() == hash }
+    return nameless.filter { (contact.isPrivate() || it.id != contact.id) && it.getHashToCompare() == hash }
 }
 
 private typealias DataReader = (contact: Contact, cursor: Cursor) -> Unit
