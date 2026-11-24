@@ -288,7 +288,7 @@ class VcardToContactTest {
     }
 
     @Test
-    fun formattedOnlyAddressHasNoStreet() {
+    fun labelEqualToStreetKeepsTheStreet() {
         val address = parse(
             """
             BEGIN:VCARD
@@ -298,7 +298,7 @@ class VcardToContactTest {
             """
         ).contact.addresses.single()
         assertEquals("Somewhere 1", address.value)
-        assertEquals("", address.street)
+        assertEquals("Somewhere 1", address.street)
     }
 
     @Test
@@ -321,10 +321,11 @@ class VcardToContactTest {
             N:C;;;;
             END:VCARD
         """.trimIndent()
-        val surnames = Ezvcard.parse(text).all().map { card ->
-            card.toParsedCard("src") { it }.contact.surname
+        val contacts = Ezvcard.parse(text).all().map { card ->
+            card.toParsedCard("src") { it }.contact
         }
-        assertEquals(listOf("A", "B", "C"), surnames)
+        assertEquals(listOf("A", "B", "C"), contacts.map { it.surname })
+        assertTrue(contacts[1].events.contains(Event("circa 1800", CommonDataKinds.Event.TYPE_BIRTHDAY)))
     }
 
     @Test
@@ -338,5 +339,81 @@ class VcardToContactTest {
             """
         ).groupNames
         assertEquals(listOf("Friends", "Work"), groupNames)
+    }
+
+    @Test
+    fun customPhoneLabelKeepsItsCase() {
+        val phone = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            TEL;TYPE=Boat:+3
+            END:VCARD
+            """
+        ).contact.phoneNumbers.single()
+        assertEquals(CommonDataKinds.Phone.TYPE_CUSTOM, phone.type)
+        assertEquals("Boat", phone.label)
+    }
+
+    @Test
+    fun faxHomeInEitherOrder() {
+        val fax = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            TEL;TYPE=fax,home:+5
+            END:VCARD
+            """
+        ).contact.phoneNumbers.single()
+        assertEquals(CommonDataKinds.Phone.TYPE_FAX_HOME, fax.type)
+
+        val reversed = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            TEL;TYPE=home,fax:+7
+            END:VCARD
+            """
+        ).contact.phoneNumbers.single()
+        assertEquals(CommonDataKinds.Phone.TYPE_FAX_HOME, reversed.type)
+    }
+
+    @Test
+    fun nonIntegerPrefParamDoesNotThrow() {
+        val phone = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            TEL;TYPE=cell;PREF=x:+6
+            END:VCARD
+            """
+        ).contact.phoneNumbers.single()
+        assertFalse(phone.isPrimary)
+    }
+
+    @Test
+    fun utcBirthdayIsADate() {
+        val events = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            BDAY:19900101T000000Z
+            END:VCARD
+            """
+        ).contact.events
+        assertEquals(listOf(Event("1990-01-01", CommonDataKinds.Event.TYPE_BIRTHDAY)), events)
+    }
+
+    @Test
+    fun textBirthdayIn30IsKept() {
+        val events = parse(
+            """
+            BEGIN:VCARD
+            VERSION:3.0
+            BDAY:circa 1800
+            END:VCARD
+            """
+        ).contact.events
+        assertEquals(listOf(Event("circa 1800", CommonDataKinds.Event.TYPE_BIRTHDAY)), events)
     }
 }

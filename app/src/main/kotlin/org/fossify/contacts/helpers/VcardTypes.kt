@@ -46,7 +46,7 @@ internal fun phoneTypeId(type: String, subtype: String?): Int =
         MAIN -> Phone.TYPE_MAIN
         WORK_FAX -> Phone.TYPE_FAX_WORK
         HOME_FAX -> Phone.TYPE_FAX_HOME
-        FAX -> Phone.TYPE_FAX_WORK
+        FAX -> if (subtype?.uppercase(Locale.ROOT) == HOME) Phone.TYPE_FAX_HOME else Phone.TYPE_FAX_WORK
         PAGER -> Phone.TYPE_PAGER
         OTHER -> Phone.TYPE_OTHER
         else -> Phone.TYPE_CUSTOM

@@ -16,7 +16,9 @@ import org.fossify.commons.models.contacts.Email
 import org.fossify.commons.models.contacts.Event
 import org.fossify.commons.models.contacts.IM
 import org.fossify.commons.models.contacts.Organization
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 private const val NO_YEAR = 1900
 
@@ -74,7 +76,7 @@ fun VCard.toParsedCard(source: String, normalize: (String) -> String): ParsedCar
 private fun VCard.readPhones(normalize: (String) -> String): ArrayList<PhoneNumber> = ArrayList(
     telephoneNumbers.mapNotNull { phone ->
         val number = phone.text ?: return@mapNotNull null
-        val values = phone.types.map { it.value }
+        val values = phone.parameters.types
         val types = meaningfulTypes(values)
         val type = phoneTypeId(types.firstOrNull() ?: MOBILE, types.getOrNull(1))
         PhoneNumber(
@@ -91,7 +93,7 @@ private fun VCard.readEmails(): ArrayList<Email> = ArrayList(
     emails.mapNotNull { mail ->
         val value = mail.value.orEmpty()
         if (value.isEmpty()) return@mapNotNull null
-        val types = meaningfulTypes(mail.types.map { it.value })
+        val types = meaningfulTypes(mail.parameters.types)
         val type = emailTypeId(types.firstOrNull() ?: HOME)
         val label = if (type == CommonDataKinds.Email.TYPE_CUSTOM) types.firstOrNull().orEmpty() else ""
         Email(value, type, label)
@@ -131,10 +133,7 @@ private fun readAddress(address: VcfAddress): Address? {
     val value = formatted.ifEmpty { composed.ifEmpty { poBoxOrNeighborhood } }
     if (value.isEmpty()) return null
 
-    // the exporter writes a formatted-only address as street = label = value
-    val formattedOnly = formatted.isNotEmpty() && street == formatted &&
-        listOf(country, region, city, postcode, pobox, neighborhood).all { it.isEmpty() }
-    val typeNames = meaningfulTypes(address.types.map { it.value })
+    val typeNames = meaningfulTypes(address.parameters.types)
     val type = addressTypeId(typeNames.firstOrNull() ?: HOME)
     return Address(
         value = value,
@@ -145,7 +144,7 @@ private fun readAddress(address: VcfAddress): Address? {
         city = city,
         postcode = postcode,
         pobox = pobox,
-        street = if (formattedOnly) "" else street,
+        street = street,
         neighborhood = neighborhood
     )
 }
@@ -157,6 +156,18 @@ private fun VCard.readEvents(): ArrayList<Event> {
     }
     birthdays.forEach { property ->
         eventValue(property)?.let { events.add(Event(it, CommonDataKinds.Event.TYPE_BIRTHDAY)) }
+    }
+    // a 3.0 BDAY or ANNIVERSARY that is not a date is kept by ezvcard as a raw property
+    listOf(
+        "BDAY" to CommonDataKinds.Event.TYPE_BIRTHDAY,
+        "ANNIVERSARY" to CommonDataKinds.Event.TYPE_ANNIVERSARY
+    ).forEach { (name, type) ->
+        getExtendedProperties(name).forEach { raw ->
+            val value = raw.value.orEmpty()
+            if (value.isNotBlank()) {
+                events.add(Event(value, type))
+            }
+        }
     }
     getExtendedProperties(X_EVENT).forEach { raw ->
         val value = raw.value.orEmpty()
@@ -173,7 +184,10 @@ private fun eventValue(property: DateOrTimeProperty): String? {
     val date = property.date
     val partial = property.partialDate
     return when {
-        date != null -> runCatching { LocalDate.from(date) }.getOrNull()?.let { day ->
+        date != null -> runCatching {
+            // a UTC time such as BDAY:19900101T000000Z parses to an Instant, which needs a zone to give a day
+            if (date is Instant) date.atZone(ZoneOffset.UTC).toLocalDate() else LocalDate.from(date)
+        }.getOrNull()?.let { day ->
             if (day.year == NO_YEAR) {
                 // for backward compatibility with old exports
                 "--%02d-%02d".format(day.monthValue, day.dayOfMonth)
