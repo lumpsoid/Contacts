@@ -9,6 +9,7 @@ import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.ContactsHelper
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.contacts.R
+import org.fossify.contacts.adapters.DedupeAdapter
 import org.fossify.contacts.databinding.ActivityDedupeBinding
 import org.fossify.contacts.helpers.DedupeSelection
 import org.fossify.contacts.helpers.DuplicateScanner
@@ -70,6 +71,7 @@ class DedupeActivity : SimpleActivity() {
         val newSelection = DedupeSelection(result)
         restoredState?.let { newSelection.restoreState(it) }
         selection = newSelection
+        binding.dedupeList.adapter = DedupeAdapter(this, newSelection, accountNames) { updateSummary() }
         binding.dedupeList.beVisible()
         binding.dedupeBottomBar.beVisible()
         updateSummary()
