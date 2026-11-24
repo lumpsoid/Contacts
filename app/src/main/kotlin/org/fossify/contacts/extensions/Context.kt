@@ -16,11 +16,9 @@ import org.fossify.contacts.BuildConfig
 import org.fossify.contacts.R
 import org.fossify.contacts.helpers.AUTOMATIC_BACKUP_REQUEST_CODE
 import org.fossify.contacts.helpers.Config
-import org.fossify.contacts.helpers.ContactLinkHelper
 import org.fossify.contacts.helpers.VcfExporter
 import org.fossify.contacts.helpers.getNextAutoBackupTime
 import org.fossify.contacts.helpers.getPreviousAutoBackupTime
-import org.fossify.contacts.helpers.withoutKeptSeparate
 import org.fossify.contacts.receivers.AutomaticBackupReceiver
 import org.joda.time.DateTime
 import java.io.File
@@ -161,21 +159,4 @@ fun Context.copyUriToTempFile(uri: Uri, name: String): File? {
     }
 
     return tempFile
-}
-
-/**
- * Commons getDuplicatesOfContactWithNameless, without the raw contacts the system keeps apart
- * (see withoutKeptSeparate). Calls back on a background thread.
- */
-fun Context.getDuplicatesKeptTogether(contact: Contact, addOriginal: Boolean, callback: (ArrayList<Contact>) -> Unit) {
-    getDuplicatesOfContactWithNameless(contact) { duplicates ->
-        ensureBackgroundThread {
-            val result = ArrayList<Contact>()
-            if (addOriginal) {
-                result.add(contact)
-            }
-            result.addAll(withoutKeptSeparate(contact, duplicates, ContactLinkHelper(this).getKeptSeparatePairs()))
-            callback(result)
-        }
-    }
 }
