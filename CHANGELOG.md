@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed contacts without a name (for example, only a phone number) not showing in the list or on a linked contact
+- Fixed contacts without a name missing from exports, automatic backups and contact source counts
 
 ## [1.6.0] - 2026-01-30
 ### Added
