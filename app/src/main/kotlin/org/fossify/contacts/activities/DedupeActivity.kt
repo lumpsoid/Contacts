@@ -11,7 +11,7 @@ import org.fossify.commons.extensions.beGone
 import org.fossify.commons.extensions.beVisible
 import org.fossify.commons.extensions.beVisibleIf
 import org.fossify.commons.extensions.getPublicContactSourceSync
-import org.fossify.commons.extensions.toast
+import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.extensions.updateTextColors
 import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.ContactsHelper
@@ -75,7 +75,7 @@ class DedupeActivity : SimpleActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        selection?.let { outState.putStringArrayList(SELECTION_STATE, it.saveState()) }
+        (selection?.saveState() ?: restoredState)?.let { outState.putStringArrayList(SELECTION_STATE, it) }
     }
 
     /** Scans on a background thread and then shows the review on the UI thread. */
@@ -223,7 +223,7 @@ class DedupeActivity : SimpleActivity() {
                     try {
                         startActivity(intent)
                     } catch (e: ActivityNotFoundException) {
-                        toast(org.fossify.commons.R.string.unknown_error_occurred)
+                        showErrorToast(e)
                     }
                 }
             }
