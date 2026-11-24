@@ -73,8 +73,10 @@ class MergeRunner(private val context: Context) {
                 }
             }
         } catch (e: IOException) {
+            exported = false
             context.showErrorToast(e)
         } catch (e: SecurityException) {
+            exported = false
             context.showErrorToast(e)
         }
         return exported

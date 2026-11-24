@@ -37,6 +37,7 @@ class VcfExporter {
         version: VCardVersion = VCardVersion.V4_0,
         callback: (result: ExportResult) -> Unit,
     ) {
+        var written = false
         try {
             if (outputStream == null) {
                 callback(EXPORT_FAIL)
@@ -205,17 +206,13 @@ class VcfExporter {
             }
 
             Ezvcard.write(cards).version(version).go(outputStream)
+            outputStream.flush()
+            written = true
         } catch (e: Exception) {
             context.showErrorToast(e)
         }
 
-        callback(
-            when {
-                contactsExported == 0 -> EXPORT_FAIL
-                contactsFailed > 0 -> ExportResult.EXPORT_PARTIAL
-                else -> ExportResult.EXPORT_OK
-            }
-        )
+        callback(exportResult(contactsExported, contactsFailed, written))
     }
 
     private fun getPhoneNumberTypeLabel(type: Int, label: String) = when (type) {
@@ -246,4 +243,11 @@ class VcfExporter {
     }
 
     private fun getPreferredType(value: Int) = "$PREF=$value"
+}
+
+/** The result of an export that built [exported] cards, [failed] of them not, and [written] them out in full. */
+fun exportResult(exported: Int, failed: Int, written: Boolean): VcfExporter.ExportResult = when {
+    !written || exported == 0 -> EXPORT_FAIL
+    failed > 0 -> VcfExporter.ExportResult.EXPORT_PARTIAL
+    else -> VcfExporter.ExportResult.EXPORT_OK
 }

@@ -23,6 +23,7 @@ import org.fossify.contacts.receivers.AutomaticBackupReceiver
 import org.joda.time.DateTime
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 
 val Context.config: Config get() = Config.newInstance(applicationContext)
 fun Context.getCachePhotoUri(file: File = getCachePhoto()) = FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.provider", file)
@@ -65,6 +66,8 @@ fun Context.cancelScheduledAutomaticBackup() {
 
 fun Context.checkAndBackupContactsOnBoot() {
     if (config.autoBackup) {
+        // alarms don't survive a reboot or an app update
+        scheduleNextAutomaticBackup()
         val previousRealBackupTime = config.lastAutoBackupTime
         val previousScheduledBackupTime = getPreviousAutoBackupTime().millis
         val missedPreviousBackup = previousRealBackupTime < previousScheduledBackupTime
@@ -133,18 +136,26 @@ fun Context.backupContacts() {
                 return@getContactsWithNameless
             }
 
-            VcfExporter().exportContacts(
-                context = this,
-                outputStream = outputStream,
-                contacts = contactsToBackup.toMutableList() as ArrayList<Contact>,
-                showExportingToast = false
-            ) { exportResult ->
-                if (exportResult == VcfExporter.ExportResult.EXPORT_FAIL) {
-                    toast(org.fossify.commons.R.string.exporting_failed)
+            var result = VcfExporter.ExportResult.EXPORT_FAIL
+            try {
+                outputStream.use { stream ->
+                    VcfExporter().exportContacts(
+                        context = this,
+                        outputStream = stream,
+                        contacts = contactsToBackup.toMutableList() as ArrayList<Contact>,
+                        showExportingToast = false
+                    ) { result = it }
                 }
+            } catch (e: IOException) {
+                showErrorToast(e)
+                result = VcfExporter.ExportResult.EXPORT_FAIL
             }
 
-            config.lastAutoBackupTime = DateTime.now().millis
+            if (result == VcfExporter.ExportResult.EXPORT_FAIL) {
+                toast(org.fossify.commons.R.string.exporting_failed)
+            } else {
+                config.lastAutoBackupTime = DateTime.now().millis
+            }
             scheduleNextAutomaticBackup()
         }
     }
