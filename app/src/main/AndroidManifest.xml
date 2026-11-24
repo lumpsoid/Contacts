@@ -94,6 +94,13 @@
             android:parentActivityName=".activities.MainActivity" />
 
         <activity
+            android:name=".activities.DedupeActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="false"
+            android:label="@string/find_and_merge_duplicates"
+            android:parentActivityName=".activities.SettingsActivity" />
+
+        <activity
             android:name=".activities.ViewContactActivity"
             android:configChanges="orientation"
             android:exported="true"

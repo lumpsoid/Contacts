@@ -112,6 +112,40 @@
         <item quantity="other">%d groups</item>
     </plurals>
 
+    <!-- Find and merge duplicates -->
+    <string name="find_and_merge_duplicates">Find and merge duplicates</string>
+    <string name="dedupe_scanning">Looking for duplicates…</string>
+    <string name="dedupe_no_duplicates">No duplicates found</string>
+    <string name="dedupe_section_duplicates">Duplicates</string>
+    <string name="dedupe_section_split">Details stored only in another account</string>
+    <string name="dedupe_same_name_and_detail">Same name + phone or email</string>
+    <string name="dedupe_same_name_only">Same name only</string>
+    <string name="dedupe_read_only_record">Details will be copied, this record stays linked</string>
+    <string name="dedupe_result_preview">Result: %s</string>
+    <string name="dedupe_summary">%1$d groups · %2$d contacts → %3$d</string>
+    <string name="dedupe_keep_apart">Keep these contacts apart from now on?</string>
+    <string name="dedupe_photo">Photo</string>
+    <string name="dedupe_organization">Organization</string>
+    <string name="dedupe_photo_from">From %s</string>
+    <string name="dedupe_choose_destination">Save merged contacts to</string>
+    <string name="dedupe_sim_limit">%s (one number per contact)</string>
+    <string name="dedupe_confirm_merge">Merge %1$d groups into %2$s?</string>
+    <string name="dedupe_confirm_deletes">Deleted from %1$s: %2$d</string>
+    <string name="dedupe_confirm_synced">Contacts deleted from a synced account are deleted from its server too.</string>
+    <string name="dedupe_backup_first">Back up the affected contacts first</string>
+    <string name="dedupe_merging">Merging %1$d / %2$d</string>
+    <string name="dedupe_merged_count">Merged: %d</string>
+    <string name="dedupe_failed_count">Failed: %d</string>
+    <string name="dedupe_cancelled">Cancelled. The remaining groups were left as they are.</string>
+    <string name="dedupe_backup_saved">A backup was saved before merging.</string>
+    <string name="dedupe_backup_failed">The backup failed, so nothing was merged.</string>
+    <string name="dedupe_open_backup">Open backup</string>
+    <string name="dedupe_done">Done</string>
+    <string name="dedupe_fail_sim">Too many numbers for the SIM</string>
+    <string name="dedupe_fail_write">Could not save the merged contact; nothing was deleted</string>
+    <string name="dedupe_fail_delete">Could not delete the old copies</string>
+    <string name="dedupe_fail_link">Could not link to the messenger contacts</string>
+
     <!-- FAQ -->
     <string name="faq_1_title">I want to change what fields are visible at contacts. Can I do it?</string>
     <string name="faq_1_text">Yes, all you have to do is go in Settings -> Manage shown contact fields. There you can select what fields should be visible. Some of them are even disabled by default, so you might find some new ones there.</string>
