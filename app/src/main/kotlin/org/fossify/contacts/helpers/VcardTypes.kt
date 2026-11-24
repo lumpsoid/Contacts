@@ -66,3 +66,31 @@ internal fun addressTypeId(type: String): Int = when (type.uppercase(Locale.ROOT
     OTHER -> StructuredPostal.TYPE_OTHER
     else -> StructuredPostal.TYPE_CUSTOM
 }
+
+/** The TYPE names a phone number is written with: a fax is its kind plus FAX, an unnamed kind is its label. */
+internal fun phoneTypeNames(type: Int, label: String): List<String> = when (type) {
+    Phone.TYPE_MOBILE -> listOf(CELL)
+    Phone.TYPE_HOME -> listOf(HOME)
+    Phone.TYPE_WORK -> listOf(WORK)
+    Phone.TYPE_MAIN -> listOf(MAIN)
+    Phone.TYPE_FAX_WORK -> listOf(WORK, FAX)
+    Phone.TYPE_FAX_HOME -> listOf(HOME, FAX)
+    Phone.TYPE_PAGER -> listOf(PAGER)
+    Phone.TYPE_OTHER -> listOf(OTHER)
+    else -> listOfNotNull(label.takeIf { it.isNotBlank() })
+}
+
+internal fun emailTypeName(type: Int, label: String): String = when (type) {
+    Email.TYPE_HOME -> HOME
+    Email.TYPE_WORK -> WORK
+    Email.TYPE_MOBILE -> MOBILE
+    Email.TYPE_OTHER -> OTHER
+    else -> label
+}
+
+internal fun addressTypeName(type: Int, label: String): String = when (type) {
+    StructuredPostal.TYPE_HOME -> HOME
+    StructuredPostal.TYPE_WORK -> WORK
+    StructuredPostal.TYPE_OTHER -> OTHER
+    else -> label
+}
