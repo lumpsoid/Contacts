@@ -237,12 +237,15 @@ class ContactsAdapter(
                     emptyList()
                 }
 
-                ContactsHelper(activity).deleteContacts(contactsToRemove
-                    .flatMap { contactToRemove -> allContacts.filter {
+                val matches = contactsToRemove.flatMap { contactToRemove ->
+                    allContacts.filter {
                         (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
                             it.getHashToCompare() == contactToRemove.getHashToCompare()
-                    } }
-                    .toMutableList() as ArrayList<Contact>)
+                    }
+                }
+                // nameless raw contacts are never in allContacts, so delete the selected ones directly too
+                val toDelete = (contactsToRemove + matches).distinctBy { "${it.isPrivate()}:${it.id}" }
+                ContactsHelper(activity).deleteContacts(ArrayList(toDelete))
                 linkHelper.deleteRawContacts(linkedRawIds)
 
                 activity.runOnUiThread {

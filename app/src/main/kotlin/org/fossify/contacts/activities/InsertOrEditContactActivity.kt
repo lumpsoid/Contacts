@@ -19,6 +19,7 @@ import org.fossify.contacts.databinding.ActivityInsertEditContactBinding
 import org.fossify.contacts.dialogs.ChangeSortingDialog
 import org.fossify.contacts.dialogs.FilterContactSourcesDialog
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.extensions.getContactsWithNameless
 import org.fossify.contacts.fragments.MyViewPagerFragment
 import org.fossify.contacts.helpers.ADD_NEW_CONTACT_NUMBER
 import org.fossify.contacts.helpers.KEY_EMAIL
@@ -245,9 +246,9 @@ class InsertOrEditContactActivity : SimpleActivity(), RefreshContactsListener {
             binding.viewPager.adapter = ViewPagerAdapter(this, contactsFavoritesList, getTabsMask())
         }
 
-        ContactsHelper(this).getContacts {
+        getContactsWithNameless {
             if (isDestroyed || isFinishing) {
-                return@getContacts
+                return@getContactsWithNameless
             }
 
             val contacts = it.filter {

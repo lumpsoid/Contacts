@@ -16,6 +16,7 @@ import org.fossify.contacts.R
 import org.fossify.contacts.adapters.ContactsAdapter
 import org.fossify.contacts.databinding.ActivityGroupContactsBinding
 import org.fossify.contacts.dialogs.SelectContactsDialog
+import org.fossify.contacts.extensions.getContactsWithNameless
 import org.fossify.contacts.extensions.handleGenericContactClick
 import org.fossify.contacts.extensions.viewContact
 import org.fossify.contacts.helpers.GROUP
@@ -108,7 +109,7 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     }
 
     private fun refreshContacts() {
-        ContactsHelper(this).getContacts {
+        getContactsWithNameless {
             wasInit = true
             allContacts = it
 
