@@ -23,7 +23,7 @@ class NameMergeTest {
     private fun device(id: Int, contactId: Int, name: String = "Ann", mimetype: String = "") =
         Contact(id = id, contactId = contactId, firstName = name, source = "acc", mimetype = mimetype)
 
-    private fun private(id: Int, name: String = "Ann") =
+    private fun privateContact(id: Int, name: String = "Ann") =
         Contact(id = id, contactId = id, firstName = name, source = "smt_private")
 
     private fun ids(contacts: List<Contact>) = contacts.map { it.id }
@@ -35,6 +35,8 @@ class NameMergeTest {
             keptSeparate = emptySet()
         )
         assertEquals(1, result.size)
+        // Equal-length compare strings: the stable sort keeps the first input.
+        assertEquals(ID_A, result.single().id)
     }
 
     @Test
@@ -47,13 +49,9 @@ class NameMergeTest {
     }
 
     @Test
-    fun pairWithReversedOrderIsHonoured() {
-        // The set holds (min, max) built by hand, while the devices are passed with the larger id first.
-        val result = mergeDuplicatesByName(
-            contacts = listOf(device(ID_B, CONTACT_B), device(ID_A, CONTACT_A)),
-            keptSeparate = setOf(Pair(ID_A, ID_B))
-        )
-        assertEquals(listOf(ID_A, ID_B), ids(result).sorted())
+    fun keptSeparatePairPutsSmallerIdFirst() {
+        assertEquals(Pair(ID_A, ID_B), keptSeparatePair(ID_B, ID_A))
+        assertEquals(Pair(ID_A, ID_B), keptSeparatePair(ID_A, ID_B))
     }
 
     @Test
@@ -92,7 +90,7 @@ class NameMergeTest {
         val result = mergeDuplicatesByName(
             contacts = listOf(
                 device(ID_A, CONTACT_A),
-                private(ID_B),
+                privateContact(ID_B),
                 device(ID_C, CONTACT_C)
             ),
             keptSeparate = setOf(keptSeparatePair(ID_A, ID_B))
@@ -167,7 +165,7 @@ class NameMergeTest {
         val a = device(ID_A, CONTACT_A)
         val result = withoutKeptSeparate(
             a,
-            listOf(private(ID_B), device(ID_C, CONTACT_C)),
+            listOf(privateContact(ID_B), device(ID_C, CONTACT_C)),
             setOf(keptSeparatePair(ID_A, ID_B)),
             VISIBLE
         )
