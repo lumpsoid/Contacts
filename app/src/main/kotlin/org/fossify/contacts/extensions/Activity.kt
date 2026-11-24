@@ -163,7 +163,7 @@ fun Activity.getDuplicateContacts(contact: Contact, includeCurrent: Boolean, cal
     if (includeCurrent) {
         duplicateContacts.add(contact)
     }
-    ContactsHelper(this).getDuplicatesOfContact(contact, false) { contacts ->
+    getDuplicatesKeptTogether(contact, false) { contacts ->
         ensureBackgroundThread {
             val displayContactSources = getVisibleContactSources()
             contacts.filter { displayContactSources.contains(it.source) }.forEach {

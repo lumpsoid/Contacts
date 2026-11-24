@@ -236,12 +236,15 @@ class ContactsAdapter(
                 } else {
                     emptyList()
                 }
+                val keptSeparate = if (config.mergeDuplicateContacts) linkHelper.getKeptSeparatePairs() else emptySet()
+                val visibleSources = activity.getVisibleContactSources()
 
                 val matches = contactsToRemove.flatMap { contactToRemove ->
-                    allContacts.filter {
+                    val sameName = allContacts.filter {
                         (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
                             it.getHashToCompare() == contactToRemove.getHashToCompare()
                     }
+                    withoutKeptSeparate(contactToRemove, sameName, keptSeparate, visibleSources)
                 }
                 // nameless raw contacts are never in allContacts, so delete the selected ones directly too
                 val toDelete = (contactsToRemove + matches).distinctBy { "${it.isPrivate()}:${it.id}" }

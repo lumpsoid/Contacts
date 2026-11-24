@@ -872,6 +872,18 @@ class ViewContactActivity : ContactActivity() {
         }
     }
 
+    private fun deleteWithDuplicates(contactToDelete: Contact, callback: () -> Unit) {
+        if (mergeDuplicate) {
+            getDuplicatesKeptTogether(contactToDelete, true) { contacts ->
+                if (ContactsHelper(this).deleteContacts(contacts)) {
+                    callback()
+                }
+            }
+        } else {
+            ContactsHelper(this).deleteContact(contactToDelete, false) { callback() }
+        }
+    }
+
     private fun deleteContactWithMergeLogic() {
         val addition = if (binding.contactSourcesHolder.childCount > 1 && mergeDuplicate) {
             "\n\n${getString(R.string.delete_from_all_sources)}"
@@ -891,7 +903,7 @@ class ViewContactActivity : ContactActivity() {
                         emptyList()
                     }
 
-                    ContactsHelper(this).deleteContact(contactToDelete, mergeDuplicate) {
+                    deleteWithDuplicates(contactToDelete) {
                         linkHelper.deleteRawContacts(linkedRawIds)
                         finish()
                     }

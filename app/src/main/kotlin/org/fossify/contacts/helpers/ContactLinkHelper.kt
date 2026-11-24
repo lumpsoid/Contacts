@@ -45,6 +45,32 @@ class ContactLinkHelper(private val context: Context) {
             .distinct()
     }
 
+    /** Pairs of device raw contact ids, smaller id first, that the system contacts provider keeps apart. */
+    fun getKeptSeparatePairs(): Set<Pair<Int, Int>> {
+        val pairs = HashSet<Pair<Int, Int>>()
+        val projection = arrayOf(AggregationExceptions.RAW_CONTACT_ID1, AggregationExceptions.RAW_CONTACT_ID2)
+        val selection = "${AggregationExceptions.TYPE} = ?"
+        val selectionArgs = arrayOf(AggregationExceptions.TYPE_KEEP_SEPARATE.toString())
+        try {
+            context.contentResolver.query(
+                AggregationExceptions.CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use {
+                while (it.moveToNext()) {
+                    pairs.add(keptSeparatePair(it.getLong(0).toInt(), it.getLong(1).toInt()))
+                }
+            }
+        } catch (e: SecurityException) {
+            context.showErrorToast(e)
+        } catch (e: IllegalArgumentException) {
+            context.showErrorToast(e)
+        }
+        return pairs
+    }
+
     fun deleteRawContacts(rawIds: List<Int>): Boolean {
         if (rawIds.isEmpty()) {
             return true
