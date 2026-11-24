@@ -44,11 +44,13 @@ class RawContactLoader(private val context: Context) {
     }
 
     /** Raw contacts without a name or organization row, from contact sources that are not hidden. */
-    fun getNamelessContacts(): List<Contact> {
+    fun getNamelessContacts(
+        ignoredContactSources: Set<String> = context.baseConfig.ignoredContactSources
+    ): List<Contact> {
         if (!context.hasPermission(PERMISSION_READ_CONTACTS)) {
             return emptyList()
         }
-        return loadContacts(getNamelessRawIds()).values.toList()
+        return loadContacts(getNamelessRawIds(ignoredContactSources)).values.toList()
     }
 
     /**
@@ -89,8 +91,7 @@ class RawContactLoader(private val context: Context) {
         return found
     }
 
-    private fun getNamelessRawIds(): List<Int> {
-        val ignoredSources = context.baseConfig.ignoredContactSources
+    private fun getNamelessRawIds(ignoredSources: Set<String>): List<Int> {
         val rawIds = LinkedHashSet<Int>()
         val rawProjection = arrayOf(RawContacts._ID, RawContacts.ACCOUNT_NAME, RawContacts.ACCOUNT_TYPE)
         val rawSelection = "${RawContacts.DELETED} = 0"
@@ -190,6 +191,25 @@ fun addNamelessContacts(
         .filter { !mergeLinked || it.contactId == 0 || !listedContactIds.contains(it.contactId) }
         .let { if (mergeLinked) it.distinctByLinkedContact() else it }
     return ArrayList(listed + shown)
+}
+
+/** How nameless contacts join a list; mirrors commons ContactsHelper.getContacts for named ones. */
+data class NamelessRules(val mergeLinked: Boolean, val onlyWithNumbers: Boolean)
+
+fun namelessRules(
+    getAll: Boolean,
+    ignoredContactSources: Set<String>,
+    mergeDuplicates: Boolean,
+    showOnlyWithNumbers: Boolean
+) = NamelessRules(
+    mergeLinked = mergeDuplicates && ignoredContactSources.isEmpty() && !getAll,
+    onlyWithNumbers = showOnlyWithNumbers && ignoredContactSources.isEmpty()
+)
+
+/** The nameless contacts commons getDuplicatesOfContact would call duplicates of [contact], if it could load them. */
+fun namelessDuplicatesOf(contact: Contact, nameless: List<Contact>): List<Contact> {
+    val hash = contact.getHashToCompare()
+    return nameless.filter { it.id != contact.id && it.getHashToCompare() == hash }
 }
 
 private typealias DataReader = (contact: Contact, cursor: Cursor) -> Unit
