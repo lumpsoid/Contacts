@@ -17,6 +17,7 @@ import ezvcard.property.StructuredName
 import ezvcard.property.Telephone
 import ezvcard.property.Title
 import ezvcard.util.PartialDate
+import org.fossify.commons.models.contacts.Address as ContactAddress
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.IM
 import java.time.LocalDate
@@ -113,32 +114,43 @@ private fun VCard.addEmails(contact: Contact) {
  * formatted value is written as its street and no LABEL, so that it reads back as formatted-only.
  */
 private fun VCard.addAddresses(contact: Contact) {
-    contact.addresses.forEach {
-        val hasParts = listOf(it.country, it.region, it.city, it.postcode, it.pobox, it.street, it.neighborhood)
-            .any { part -> part.isNotEmpty() }
-        if (hasParts || it.value.isNotEmpty()) {
-            val address = Address()
-            if (hasParts) {
-                address.country = it.country
-                address.region = it.region
-                address.locality = it.city
-                address.postalCode = it.postcode
-                address.poBox = it.pobox
-                address.streetAddress = it.street
-                address.extendedAddress = it.neighborhood
-                if (it.value.isNotEmpty()) {
-                    address.label = it.value
-                }
-            } else {
-                address.streetAddress = it.value
-            }
-            val typeName = addressTypeName(it.type, it.label)
-            if (typeName.isNotEmpty()) {
-                address.parameters.addType(typeName)
-            }
-            addAddress(address)
-        }
+    contact.addresses.mapNotNull { toVcfAddress(it) }.forEach { addAddress(it) }
+}
+
+/** The vCard address for [source], or null when it has neither parts nor a formatted value. */
+private fun toVcfAddress(source: ContactAddress): Address? {
+    val hasParts = listOf(
+        source.country,
+        source.region,
+        source.city,
+        source.postcode,
+        source.pobox,
+        source.street,
+        source.neighborhood,
+    ).any { part -> part.isNotEmpty() }
+    if (!hasParts && source.value.isEmpty()) {
+        return null
     }
+    val address = Address()
+    if (hasParts) {
+        address.country = source.country
+        address.region = source.region
+        address.locality = source.city
+        address.postalCode = source.postcode
+        address.poBox = source.pobox
+        address.streetAddress = source.street
+        address.extendedAddress = source.neighborhood
+        if (source.value.isNotEmpty()) {
+            address.label = source.value
+        }
+    } else {
+        address.streetAddress = source.value
+    }
+    val typeName = addressTypeName(source.type, source.label)
+    if (typeName.isNotEmpty()) {
+        address.parameters.addType(typeName)
+    }
+    return address
 }
 
 private fun VCard.addEvents(contact: Contact) {
