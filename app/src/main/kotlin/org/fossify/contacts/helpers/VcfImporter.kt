@@ -6,6 +6,7 @@ import android.provider.ContactsContract.CommonDataKinds
 import android.provider.ContactsContract.CommonDataKinds.Im
 import android.provider.ContactsContract.CommonDataKinds.Phone
 import android.provider.ContactsContract.CommonDataKinds.StructuredPostal
+import android.util.Log
 import android.widget.Toast
 import ezvcard.Ezvcard
 import ezvcard.VCard
@@ -40,9 +41,6 @@ class VcfImporter(val activity: SimpleActivity) {
         IMPORT_FAIL, IMPORT_OK, IMPORT_PARTIAL
     }
 
-    private var contactsImported = 0
-    private var contactsFailed = 0
-
     fun importContacts(path: String, targetContactSource: String): ImportResult {
         try {
             val inputStream = if (path.contains("/")) {
@@ -52,7 +50,10 @@ class VcfImporter(val activity: SimpleActivity) {
             }
 
             val ezContacts = Ezvcard.parse(inputStream).all()
-            for (ezContact in ezContacts) {
+            val counts = runEach(
+                ezContacts,
+                onFailure = { e -> Log.w("VcfImporter", "skipped a vCard", e) }
+            ) { ezContact ->
                 val structuredName = ezContact.structuredName
                 val prefix = structuredName?.prefixes?.firstOrNull() ?: ""
                 val firstName = structuredName?.given ?: ""
@@ -282,19 +283,12 @@ class VcfImporter(val activity: SimpleActivity) {
                     contact.mimetype = CommonDataKinds.Organization.CONTENT_ITEM_TYPE
                 }
 
-                if (ContactsHelper(activity).insertContact(contact)) {
-                    contactsImported++
-                }
+                ContactsHelper(activity).insertContact(contact)
             }
+            return importResult(counts.done, counts.failed)
         } catch (e: Exception) {
             activity.showErrorToast(e, Toast.LENGTH_LONG)
-            contactsFailed++
-        }
-
-        return when {
-            contactsImported == 0 -> IMPORT_FAIL
-            contactsFailed > 0 -> IMPORT_PARTIAL
-            else -> IMPORT_OK
+            return IMPORT_FAIL
         }
     }
 
@@ -411,4 +405,11 @@ class VcfImporter(val activity: SimpleActivity) {
 
         return -1
     }
+}
+
+/** The result of an import that stored [imported] cards and failed on [failed] of them. */
+fun importResult(imported: Int, failed: Int): VcfImporter.ImportResult = when {
+    imported == 0 -> IMPORT_FAIL
+    failed > 0 -> IMPORT_PARTIAL
+    else -> IMPORT_OK
 }

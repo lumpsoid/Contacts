@@ -6,6 +6,7 @@ import android.provider.ContactsContract.CommonDataKinds.Event
 import android.provider.ContactsContract.CommonDataKinds.Im
 import android.provider.ContactsContract.CommonDataKinds.Phone
 import android.provider.ContactsContract.CommonDataKinds.StructuredPostal
+import android.util.Log
 import androidx.core.net.toUri
 import ezvcard.Ezvcard
 import ezvcard.VCard
@@ -26,9 +27,6 @@ class VcfExporter {
         EXPORT_FAIL, EXPORT_OK, EXPORT_PARTIAL
     }
 
-    private var contactsExported = 0
-    private var contactsFailed = 0
-
     fun exportContacts(
         context: Context,
         outputStream: OutputStream?,
@@ -38,6 +36,7 @@ class VcfExporter {
         callback: (result: ExportResult) -> Unit,
     ) {
         var written = false
+        var counts = RunCounts(0, 0)
         try {
             if (outputStream == null) {
                 callback(EXPORT_FAIL)
@@ -49,7 +48,10 @@ class VcfExporter {
             }
 
             val cards = ArrayList<VCard>()
-            for (contact in contacts) {
+            counts = runEach(
+                contacts,
+                onFailure = { e -> Log.w("VcfExporter", "skipped a contact", e) }
+            ) { contact ->
                 val card = VCard()
 
                 val formattedName = arrayOf(
@@ -202,7 +204,7 @@ class VcfExporter {
                 }
 
                 cards.add(card)
-                contactsExported++
+                true
             }
 
             Ezvcard.write(cards).version(version).go(outputStream)
@@ -212,7 +214,7 @@ class VcfExporter {
             context.showErrorToast(e)
         }
 
-        callback(exportResult(contactsExported, contactsFailed, written))
+        callback(exportResult(counts.done, counts.failed, written))
     }
 
     private fun getPhoneNumberTypeLabel(type: Int, label: String) = when (type) {
