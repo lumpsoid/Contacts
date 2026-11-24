@@ -6,9 +6,19 @@ import android.net.Uri
 sealed class MergeRunResult {
     data object BackupFailed : MergeRunResult()
 
+    /** [total] plans were asked for; [outcomes] holds one entry per plan that ran, in order. */
     data class Finished(
         val outcomes: List<MergeOutcome>,
         val backupUri: Uri?,
-        val cancelled: Boolean
-    ) : MergeRunResult()
+        val total: Int
+    ) : MergeRunResult() {
+        val cancelled: Boolean get() = outcomes.size < total
+
+        fun mergedCount() = outcomes.count { it is MergeOutcome.Merged }
+
+        fun failures(): List<MergeOutcome.Failed> = outcomes.filterIsInstance<MergeOutcome.Failed>()
+
+        /** Plans that never started because the run was cancelled. */
+        fun skippedCount() = total - outcomes.size
+    }
 }

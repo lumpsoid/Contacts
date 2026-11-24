@@ -9,7 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.beGone
 import org.fossify.commons.extensions.beVisible
-import org.fossify.commons.extensions.beVisibleIf
 import org.fossify.commons.extensions.getPublicContactSourceSync
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.extensions.updateTextColors
@@ -24,7 +23,6 @@ import org.fossify.contacts.adapters.DedupeAdapter
 import org.fossify.contacts.databinding.ActivityDedupeBinding
 import org.fossify.contacts.dialogs.ConfirmMergeDialog
 import org.fossify.contacts.extensions.config
-import org.fossify.contacts.extensions.runResultText
 import org.fossify.contacts.helpers.DedupeSelection
 import org.fossify.contacts.helpers.DuplicateScanner
 import org.fossify.contacts.helpers.MergeRunner
@@ -34,6 +32,7 @@ import org.fossify.contacts.helpers.summarize
 import org.fossify.contacts.models.AccountAccess
 import org.fossify.contacts.models.MergeRunResult
 import org.fossify.contacts.models.ScanResult
+import org.fossify.contacts.views.MergeResultPage
 import org.joda.time.DateTime
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -45,6 +44,7 @@ class DedupeActivity : SimpleActivity() {
     private var restoredState: ArrayList<String>? = null
     private val cancelled = AtomicBoolean(false)
     private var pendingDestination: Pair<ContactSource, AccountAccess>? = null
+    private var destinationName = ""
     private val backupPicker = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/x-vcard")
     ) { uri ->
@@ -63,7 +63,7 @@ class DedupeActivity : SimpleActivity() {
         binding.dedupeClose.setOnClickListener { finish() }
         binding.dedupeMerge.setOnClickListener { pickDestination() }
         binding.dedupeCancel.setOnClickListener { cancelled.set(true) }
-        binding.dedupeDone.setOnClickListener { finish() }
+        binding.dedupeResult.dedupeDone.setOnClickListener { finish() }
         restoredState = savedInstanceState?.getStringArrayList(SELECTION_STATE)
         startScan()
     }
@@ -169,6 +169,7 @@ class DedupeActivity : SimpleActivity() {
     /** Merges on a background thread; the screen stays on, and leaving it does not stop the run. */
     private fun startRun(destination: Pair<ContactSource, AccountAccess>, backupUri: Uri?) {
         val plans = selection?.plans().orEmpty()
+        destinationName = destination.first.publicName
         cancelled.set(false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.dedupeList.beGone()
@@ -196,38 +197,26 @@ class DedupeActivity : SimpleActivity() {
         }
     }
 
-    /** Shows the outcome of a run, with the backup button when a backup was written. */
+    /** Shows the outcome of a run on the result page. */
     private fun showResult(result: MergeRunResult) {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.dedupeProgressHolder.beGone()
         binding.dedupeCancel.beGone()
-        binding.dedupeResultHolder.beVisible()
-        when (result) {
-            is MergeRunResult.BackupFailed -> {
-                binding.dedupeResultText.text = getString(R.string.dedupe_backup_failed)
-                binding.dedupeOpenBackup.beGone()
+        binding.dedupeResult.root.beVisible()
+        val names = selection?.result?.let { scan ->
+            scan.duplicates.associate { it.key to it.people.first().displayName() } +
+                scan.splitDetails.associate { it.key to it.person.displayName() }
+        }.orEmpty()
+        MergeResultPage(this, binding.dedupeResult) { backupUri ->
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(backupUri, "text/x-vcard")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try {
+                startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                showErrorToast(e)
             }
-
-            is MergeRunResult.Finished -> {
-                val names = selection?.result?.let { scan ->
-                    scan.duplicates.associate { it.key to it.people.first().displayName() } +
-                        scan.splitDetails.associate { it.key to it.person.displayName() }
-                }.orEmpty()
-                binding.dedupeResultText.text = runResultText(result, names)
-                val backupUri = result.backupUri
-                binding.dedupeOpenBackup.beVisibleIf(backupUri != null)
-                binding.dedupeOpenBackup.setOnClickListener {
-                    val intent = Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(backupUri, "text/x-vcard")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    try {
-                        startActivity(intent)
-                    } catch (e: ActivityNotFoundException) {
-                        showErrorToast(e)
-                    }
-                }
-            }
-        }
+        }.show(result, names, destinationName)
     }
 
     companion object {
