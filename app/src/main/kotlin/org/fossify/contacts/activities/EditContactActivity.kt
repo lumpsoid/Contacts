@@ -125,6 +125,7 @@ import org.fossify.contacts.dialogs.SelectGroupsDialog
 import org.fossify.contacts.extensions.config
 import org.fossify.contacts.extensions.getCachePhotoUri
 import org.fossify.contacts.extensions.getContactWithIdOrRaw
+import org.fossify.contacts.extensions.getDuplicatesOfContactWithNameless
 import org.fossify.contacts.extensions.showContactSourcePicker
 import org.fossify.contacts.helpers.ADD_NEW_CONTACT_NUMBER
 import org.fossify.contacts.helpers.IS_FROM_SIMPLE_CONTACTS
@@ -1432,11 +1433,11 @@ class EditContactActivity : ContactActivity() {
     ) {
         val contactsHelper = ContactsHelper(this)
 
-        contactsHelper.getDuplicatesOfContact(contact!!, false) { contacts ->
+        getDuplicatesOfContactWithNameless(contact!!) { contacts ->
             ensureBackgroundThread {
                 val displayContactSources = getVisibleContactSources()
                 contacts.filter { displayContactSources.contains(it.source) }.forEach { contact ->
-                    val duplicate = contactsHelper.getContactWithId(contact.id, contact.isPrivate())
+                    val duplicate = getContactWithIdOrRaw(contact.id, contact.isPrivate())
                     if (duplicate != null) {
                         if (primaryStatus == PrimaryNumberStatus.UNSTARRED) {
                             val number = duplicate.phoneNumbers.find { it.normalizedNumber == toggleState.first!!.normalizedNumber }
