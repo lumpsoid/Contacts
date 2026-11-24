@@ -53,6 +53,12 @@ const val HANGOUTS = "Hangouts"
 const val QQ = "QQ"
 const val JABBER = "Jabber"
 
+// vCard extensions this app writes and reads back
+const val X_EVENT = "X-FOSSIFY-EVENT"
+const val X_EVENT_TYPE = "X-TYPE"
+const val X_IM_LABEL = "X-LABEL"
+const val CUSTOM_IM_SCHEME = "x-im"
+
 const val WHATSAPP = "whatsapp"
 const val SIGNAL = "signal"
 const val VIBER = "viber"
