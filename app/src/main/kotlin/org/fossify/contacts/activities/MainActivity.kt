@@ -2,6 +2,7 @@ package org.fossify.contacts.activities
 
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
+import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.graphics.drawable.ColorDrawable
@@ -386,12 +387,17 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         }
 
         if (uri != null) {
-            tryImportContactsFromFile(uri) { success ->
-                if (success) {
-                    runOnUiThread {
-                        refreshContacts(ALL_TABS_MASK)
+            // Other apps may only hand us content URIs; a file path would let them read any file we can reach.
+            if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
+                tryImportContactsFromFile(uri) { success ->
+                    if (success) {
+                        runOnUiThread {
+                            refreshContacts(ALL_TABS_MASK)
+                        }
                     }
                 }
+            } else {
+                toast(org.fossify.commons.R.string.invalid_file_format)
             }
             intent.action = null
         }
