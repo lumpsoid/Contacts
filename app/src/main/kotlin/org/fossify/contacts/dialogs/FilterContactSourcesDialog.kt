@@ -12,6 +12,7 @@ import org.fossify.contacts.activities.SimpleActivity
 import org.fossify.contacts.adapters.FilterContactSourcesAdapter
 import org.fossify.contacts.databinding.DialogFilterContactSourcesBinding
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.extensions.getContactsWithNameless
 
 class FilterContactSourcesDialog(val activity: SimpleActivity, private val callback: () -> Unit) {
     private var dialog: AlertDialog? = null
@@ -28,7 +29,7 @@ class FilterContactSourcesDialog(val activity: SimpleActivity, private val callb
             processDataIfReady()
         }
 
-        ContactsHelper(activity).getContacts(getAll = true) { contacts ->
+        activity.getContactsWithNameless(getAll = true) { contacts ->
             contacts.mapTo(this@FilterContactSourcesDialog.contacts) { it.copy() }
             isContactsReady = true
             processDataIfReady()

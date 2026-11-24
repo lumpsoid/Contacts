@@ -12,6 +12,7 @@ import org.fossify.contacts.activities.SimpleActivity
 import org.fossify.contacts.adapters.FilterContactSourcesAdapter
 import org.fossify.contacts.databinding.DialogManageAutomaticBackupsBinding
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.extensions.getContactsWithNameless
 import java.io.File
 
 class ManageAutoBackupsDialog(private val activity: SimpleActivity, onSuccess: () -> Unit) {
@@ -51,7 +52,7 @@ class ManageAutoBackupsDialog(private val activity: SimpleActivity, onSuccess: (
                 processDataIfReady(this)
             }
 
-            ContactsHelper(activity).getContacts(getAll = true) { receivedContacts ->
+            activity.getContactsWithNameless(getAll = true, showOnlyContactsWithNumbers = false) { receivedContacts ->
                 contacts = receivedContacts
                 isContactsReady = true
                 processDataIfReady(this)
