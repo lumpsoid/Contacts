@@ -85,12 +85,13 @@ fun Context.backupContacts() {
     require(isRPlus())
     ensureBackgroundThread {
         val config = config
-        ContactsHelper(this).getContactsToExport(selectedContactSources = config.autoBackupContactSources) { contactsToBackup ->
+        getContactsWithNameless(getAll = true) { contacts ->
+            val contactsToBackup = contacts.filter { it.source in config.autoBackupContactSources }
             if (contactsToBackup.isEmpty()) {
                 toast(org.fossify.commons.R.string.no_entries_for_exporting)
                 config.lastAutoBackupTime = DateTime.now().millis
                 scheduleNextAutomaticBackup()
-                return@getContactsToExport
+                return@getContactsWithNameless
             }
 
 
@@ -135,7 +136,7 @@ fun Context.backupContacts() {
             } catch (e: Exception) {
                 showErrorToast(e)
                 scheduleNextAutomaticBackup()
-                return@getContactsToExport
+                return@getContactsWithNameless
             }
 
             VcfExporter().exportContacts(
