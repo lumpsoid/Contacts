@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added linking of contacts, so linked contacts show as one in other apps too
 - Added unlinking of linked contacts from the contact details screen
 - Added merging of contacts stored in phone storage (not visible by other apps)
+- Added "Find and merge duplicates" in settings: merges duplicate contacts and details kept in other accounts into one account, with a backup first
 
 ### Fixed
 - Fixed contacts without a name (for example, only a phone number) not showing in the list or on a linked contact
