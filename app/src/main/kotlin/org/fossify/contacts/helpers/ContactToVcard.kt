@@ -25,6 +25,9 @@ private const val PNG_SIGNATURE = "\u0089PNG"
 private const val GIF_SIGNATURE = "GIF8"
 private const val SIGNATURE_LENGTH = 4
 private val CUSTOM_LABEL_SCHEME = Regex("[A-Za-z][A-Za-z0-9+.-]*")
+private val BUILT_IN_IM_SCHEMES = listOf("aim", "ymsgr", "msnim", "icq", "skype", HANGOUTS, QQ, JABBER)
+    .map { it.lowercase() }
+    .toSet()
 private val PARTIAL_DATE = Regex("--(\\d{2})-(\\d{2})")
 private val FULL_DATE = Regex("(\\d{4})-(\\d{2})-(\\d{2})")
 
@@ -107,7 +110,7 @@ private fun VCard.addEmails(contact: Contact) {
 
 /**
  * An address with parts is written as its parts, with the formatted value as its LABEL. One with only a
- * formatted value is written as its street, so that it reads back as formatted-only.
+ * formatted value is written as its street and no LABEL, so that it reads back as formatted-only.
  */
 private fun VCard.addAddresses(contact: Contact) {
     contact.addresses.forEach {
@@ -123,11 +126,11 @@ private fun VCard.addAddresses(contact: Contact) {
                 address.poBox = it.pobox
                 address.streetAddress = it.street
                 address.extendedAddress = it.neighborhood
+                if (it.value.isNotEmpty()) {
+                    address.label = it.value
+                }
             } else {
                 address.streetAddress = it.value
-            }
-            if (it.value.isNotEmpty()) {
-                address.label = it.value
             }
             val typeName = addressTypeName(it.type, it.label)
             if (typeName.isNotEmpty()) {
@@ -193,11 +196,14 @@ private fun toImpp(im: IM): Impp {
 }
 
 /**
- * An IM on a protocol this app has no name for. A label that is a valid URI scheme becomes the scheme;
- * any other label is kept as a parameter on the x-im scheme, since Impp would reject it.
+ * An IM on a protocol this app has no name for. A label that is a valid URI scheme becomes the scheme,
+ * unless it names a built-in protocol: that would re-import as the built-in protocol and lose the label.
+ * Any other label is kept as a parameter on the x-im scheme, since Impp would reject it.
  */
 private fun customImpp(label: String, value: String): Impp {
-    if (CUSTOM_LABEL_SCHEME.matches(label)) return Impp(label, value)
+    if (CUSTOM_LABEL_SCHEME.matches(label) && label.lowercase() !in BUILT_IN_IM_SCHEMES) {
+        return Impp(label, value)
+    }
     val impp = Impp(CUSTOM_IM_SCHEME, value)
     if (label.isNotEmpty()) {
         impp.addParameter(X_IM_LABEL, label)

@@ -51,8 +51,22 @@ class VcardRoundTripTest {
         val contact = Contact(id = 0, contactId = 0, firstName = "Ann", addresses = arrayListOf(address))
         val parsed = roundTrip(contact).contact.addresses.single()
         assertEquals("Somewhere 1, Town", parsed.value)
-        assertEquals("", parsed.street)
-        assertEquals(address, parsed)
+        assertEquals("Somewhere 1, Town", parsed.street)
+        assertEquals(address.type, parsed.type)
+        assertEquals(address.label, parsed.label)
+        assertFalse(write(contact).contains("LABEL"))
+    }
+
+    @Test
+    fun streetOnlyStructuredAddressSurvives() {
+        val address = Address(
+            value = "1 Main St",
+            type = CommonDataKinds.StructuredPostal.TYPE_HOME,
+            label = "",
+            street = "1 Main St",
+        )
+        val contact = Contact(id = 0, contactId = 0, firstName = "Ann", addresses = arrayListOf(address))
+        assertEquals(address, roundTrip(contact).contact.addresses.single())
     }
 
     @Test
@@ -62,6 +76,7 @@ class VcardRoundTripTest {
             IM("john+doe%1", CommonDataKinds.Im.PROTOCOL_CUSTOM, "My IM"),
             IM("h2", CommonDataKinds.Im.PROTOCOL_CUSTOM, ""),
             IM("h3", CommonDataKinds.Im.PROTOCOL_CUSTOM, "matrix"),
+            IM("h4", CommonDataKinds.Im.PROTOCOL_CUSTOM, "Skype"),
         )
         val contact = Contact(id = 0, contactId = 0, firstName = "Ann", IMs = ims)
         assertEquals(ims, roundTrip(contact).contact.IMs)
