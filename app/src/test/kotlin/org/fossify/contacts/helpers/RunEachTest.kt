@@ -15,7 +15,7 @@ class RunEachTest {
         val visited = mutableListOf<Int>()
         val counts = runEach(listOf(1, 2, 3)) { item ->
             visited.add(item)
-            if (item == 2) throw IllegalStateException("bad")
+            if (item == 2) error("bad")
             true
         }
 
