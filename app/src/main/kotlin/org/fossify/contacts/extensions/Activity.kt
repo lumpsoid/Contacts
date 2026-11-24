@@ -210,7 +210,7 @@ fun Activity.editContact(contact: Contact) {
 
 fun SimpleActivity.tryImportContactsFromFile(uri: Uri, callback: (Boolean) -> Unit) {
     when (uri.scheme) {
-        "file" -> showImportContactsDialog(uri.path!!, callback)
+        "file" -> showImportContactsDialog(uri.path!!, onDismiss = {}, callback = callback)
         "content" -> {
             try {
                 // Sweep copies left behind by a cancelled dialog, which never reaches the callback.
@@ -225,8 +225,7 @@ fun SimpleActivity.tryImportContactsFromFile(uri: Uri, callback: (Boolean) -> Un
                     return
                 }
 
-                showImportContactsDialog(tempFile.absolutePath) { success ->
-                    tempFile.delete()
+                showImportContactsDialog(tempFile.absolutePath, onDismiss = { tempFile.delete() }) { success ->
                     callback(success)
                 }
             } catch (e: Exception) {
@@ -238,6 +237,6 @@ fun SimpleActivity.tryImportContactsFromFile(uri: Uri, callback: (Boolean) -> Un
     }
 }
 
-fun SimpleActivity.showImportContactsDialog(path: String, callback: (Boolean) -> Unit) {
-    ImportContactsDialog(this, path, callback)
+fun SimpleActivity.showImportContactsDialog(path: String, onDismiss: () -> Unit, callback: (Boolean) -> Unit) {
+    ImportContactsDialog(this, path, onDismiss, callback)
 }
