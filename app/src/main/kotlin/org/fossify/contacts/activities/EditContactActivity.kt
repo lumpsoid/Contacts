@@ -124,11 +124,13 @@ import org.fossify.contacts.dialogs.MyDatePickerDialog
 import org.fossify.contacts.dialogs.SelectGroupsDialog
 import org.fossify.contacts.extensions.config
 import org.fossify.contacts.extensions.getCachePhotoUri
+import org.fossify.contacts.extensions.getContactWithIdOrRaw
 import org.fossify.contacts.extensions.showContactSourcePicker
 import org.fossify.contacts.helpers.ADD_NEW_CONTACT_NUMBER
 import org.fossify.contacts.helpers.IS_FROM_SIMPLE_CONTACTS
 import org.fossify.contacts.helpers.KEY_EMAIL
 import org.fossify.contacts.helpers.KEY_NAME
+import org.fossify.contacts.helpers.RawContactLoader
 import java.util.LinkedList
 import java.util.Locale
 
@@ -234,7 +236,7 @@ class EditContactActivity : ContactActivity() {
 
         if (contactId != 0) {
             ensureBackgroundThread {
-                contact = ContactsHelper(this).getContactWithId(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
+                contact = getContactWithIdOrRaw(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
                 if (contact == null) {
                     toast(org.fossify.commons.R.string.unknown_error_occurred)
                     hideKeyboard()
@@ -1404,6 +1406,7 @@ class EditContactActivity : ContactActivity() {
 
     private fun updateContact(photoUpdateStatus: Int, primaryState: Pair<PhoneNumber?, PhoneNumber?>) {
         isSaving = true
+        RawContactLoader(this).ensureNameRow(contact!!)
         if (ContactsHelper(this@EditContactActivity).updateContact(contact!!, photoUpdateStatus)) {
             val status = getPrimaryNumberStatus(primaryState.first, primaryState.second)
             if (status != PrimaryNumberStatus.UNCHANGED) {

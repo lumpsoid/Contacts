@@ -16,6 +16,7 @@ import org.fossify.contacts.BuildConfig
 import org.fossify.contacts.R
 import org.fossify.contacts.helpers.AUTOMATIC_BACKUP_REQUEST_CODE
 import org.fossify.contacts.helpers.Config
+import org.fossify.contacts.helpers.RawContactLoader
 import org.fossify.contacts.helpers.VcfExporter
 import org.fossify.contacts.helpers.getNextAutoBackupTime
 import org.fossify.contacts.helpers.getPreviousAutoBackupTime
@@ -158,4 +159,10 @@ fun Context.copyUriToTempFile(uri: Uri, name: String): File? {
     }
 
     return tempFile
+}
+
+/** Commons getContactWithId misses device raw contacts without a name or organization row; load those too. */
+fun Context.getContactWithIdOrRaw(id: Int, isPrivate: Boolean): Contact? {
+    val contact = ContactsHelper(this).getContactWithId(id, isPrivate)
+    return if (contact != null || isPrivate) contact else RawContactLoader(this).getContact(id)
 }

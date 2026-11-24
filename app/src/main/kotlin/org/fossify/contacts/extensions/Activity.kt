@@ -178,7 +178,7 @@ fun Activity.getDuplicateContacts(contact: Contact, includeCurrent: Boolean, cal
                 ContactLinkHelper(this).getLinkedRawContactIds(contact.contactId)
                     .filter { !knownIds.contains(it) }
                     .forEach { rawId ->
-                        val linked = ContactsHelper(this).getContactWithId(rawId, false)
+                        val linked = getContactWithIdOrRaw(rawId, false)
                         if (linked != null && displayContactSources.contains(linked.source)) {
                             duplicateContacts.add(linked)
                         }

@@ -155,7 +155,7 @@ class ViewContactActivity : ContactActivity() {
                     if (lookupKey != null) {
                         contact = ContactsHelper(this).getContactWithLookupKey(lookupKey)
                         fullContact = contact
-                        wasLookupKeyUsed = true
+                        wasLookupKeyUsed = contact != null
                     }
 
                     getLookupUriRawId(data)
@@ -170,7 +170,7 @@ class ViewContactActivity : ContactActivity() {
         }
 
         if (contactId != 0 && !wasLookupKeyUsed) {
-            contact = ContactsHelper(this).getContactWithId(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
+            contact = getContactWithIdOrRaw(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
             fullContact = contact
 
             if (contact == null) {
