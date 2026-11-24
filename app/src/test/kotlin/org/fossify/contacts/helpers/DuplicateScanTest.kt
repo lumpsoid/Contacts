@@ -63,6 +63,24 @@ class DuplicateScanTest {
     }
 
     @Test
+    fun sharedEmailMakesASameNameGroupHigh() {
+        val shared = scanDuplicates(
+            listOf(record(1, 1, emails = listOf("ann@x.com")), record(2, 2, emails = listOf("ann@x.com"))),
+            emptySet(),
+            VISIBLE
+        )
+        assertEquals(MatchConfidence.HIGH, shared.duplicates.single().confidence)
+
+        // Positive control: different emails leave only the name in common.
+        val different = scanDuplicates(
+            listOf(record(1, 1, emails = listOf("ann@x.com")), record(2, 2, emails = listOf("bob@x.com"))),
+            emptySet(),
+            VISIBLE
+        )
+        assertEquals(MatchConfidence.LOW, different.duplicates.single().confidence)
+    }
+
+    @Test
     fun differentNamesAreNotGrouped() {
         val result = scanDuplicates(
             listOf(record(1, 1, name = "Ann Lee"), record(2, 2, name = "Bob Ray")),
@@ -142,6 +160,31 @@ class DuplicateScanTest {
             ),
             emptySet(),
             VISIBLE
+        )
+        assertTrue(whole.splitDetails.isEmpty())
+    }
+
+    @Test
+    fun splitAcrossTwoWritableAccountsIsASplitDetail() {
+        val visibleWithPhone = VISIBLE + "phone"
+        val split = scanDuplicates(
+            listOf(
+                record(1, 7, numbers = listOf("111")),
+                record(2, 7, source = "phone", access = AccountAccess.WRITABLE, numbers = listOf("222"))
+            ),
+            emptySet(),
+            visibleWithPhone
+        )
+        assertEquals(listOf("contact:7"), split.splitDetails.map { it.key })
+
+        // Positive control: record 1 holds both numbers, so no writable record is missing one.
+        val whole = scanDuplicates(
+            listOf(
+                record(1, 7, numbers = listOf("111", "222")),
+                record(2, 7, source = "phone", access = AccountAccess.WRITABLE, numbers = listOf("222"))
+            ),
+            emptySet(),
+            visibleWithPhone
         )
         assertTrue(whole.splitDetails.isEmpty())
     }

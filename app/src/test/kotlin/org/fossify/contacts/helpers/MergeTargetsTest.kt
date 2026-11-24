@@ -151,6 +151,16 @@ class MergeTargetsTest {
     }
 
     @Test
+    fun verifyComparesEmailsTrimmedAndIgnoringCase() {
+        val expected = record(1, "Google", emails = listOf("Ann@X.com ")).contact
+        val actual = record(2, "Google", emails = listOf("ann@x.com")).contact
+        assertTrue(verifyMerged(expected, actual))
+
+        val other = record(3, "Google", emails = listOf("bob@x.com")).contact
+        assertFalse(verifyMerged(expected, other))
+    }
+
+    @Test
     fun photoStatusFollowsTheUri() {
         assertEquals(PHOTO_ADDED, photoUpdateStatus("", "a"))
         assertEquals(PHOTO_CHANGED, photoUpdateStatus("a", "b"))

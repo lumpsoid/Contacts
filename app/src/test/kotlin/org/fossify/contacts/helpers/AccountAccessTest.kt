@@ -22,6 +22,12 @@ class AccountAccessTest {
     }
 
     @Test
+    fun everyCommonsMessengerTypeIsReadOnly() {
+        listOf("org.thoughtcrime.securesms", "org.telegram.messenger", "ch.threema.app", "com.whatsapp")
+            .forEach { assertEquals(it, AccountAccess.READ_ONLY, AccountAccess.of(it, emptySet())) }
+    }
+
+    @Test
     fun simAndPlainAccountsAreClassifiedByType() {
         assertEquals(AccountAccess.SIM, AccountAccess.of("com.android.sim", emptySet()))
         assertEquals(AccountAccess.WRITABLE, AccountAccess.of("com.google", emptySet()))
