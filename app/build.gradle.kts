@@ -99,6 +99,10 @@ android {
         targetCompatibility = currentJavaVersionFromLibs
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     dependenciesInfo {
         includeInApk = false
     }
@@ -146,5 +150,6 @@ dependencies {
     implementation(libs.indicatorfastscroll)
     implementation(libs.bundles.room)
     ksp(libs.androidx.room.compiler)
+    testImplementation(libs.junit)
     detektPlugins(libs.compose.detekt)
 }
