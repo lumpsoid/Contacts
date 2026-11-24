@@ -126,6 +126,20 @@ class NameMergeTest {
     }
 
     @Test
+    fun linkedRowsWithDifferentNamesCarryGroupsOnce() {
+        val withGroups = device(ID_A, CONTACT_A, "Ann").apply {
+            groups = arrayListOf(Group(1L, "Family"))
+        }
+        val result = mergeDuplicatesByName(
+            contacts = listOf(withGroups, device(ID_B, CONTACT_A, "Bob")),
+            keptSeparate = emptySet()
+        )
+        assertEquals(2, result.size)
+        assertEquals(listOf(ID_A), ids(result.filter { it.groups.isNotEmpty() }))
+        assertTrue(result.single { it.id == ID_B }.groups.isEmpty())
+    }
+
+    @Test
     fun withoutKeptSeparateDropsSeparatedDuplicates() {
         val a = device(ID_A, CONTACT_A)
         val b = device(ID_B, CONTACT_B)

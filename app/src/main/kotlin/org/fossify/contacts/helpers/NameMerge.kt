@@ -34,8 +34,12 @@ fun mergeDuplicatesByName(contacts: List<Contact>, keptSeparate: Set<Pair<Int, I
         .filter { !it.isPrivate() && it.contactId != 0 && it.groups.isNotEmpty() }
         .groupBy { it.contactId }
         .mapValues { it.value.first().groups }
-    result.filter { !it.isPrivate() && it.contactId != 0 && it.groups.isEmpty() }.forEach {
-        groupsByContactId[it.contactId]?.let { groups -> it.groups = groups }
+    val deviceRows = result.filter { !it.isPrivate() && it.contactId != 0 }
+    groupsByContactId.forEach { (contactId, groups) ->
+        val rows = deviceRows.filter { it.contactId == contactId }
+        if (rows.none { it.groups.isNotEmpty() }) {
+            rows.firstOrNull()?.let { it.groups = groups }
+        }
     }
     return result
 }
