@@ -66,6 +66,8 @@ fun Context.cancelScheduledAutomaticBackup() {
 
 fun Context.checkAndBackupContactsOnBoot() {
     if (config.autoBackup) {
+        // alarms don't survive a reboot or an app update
+        scheduleNextAutomaticBackup()
         val previousRealBackupTime = config.lastAutoBackupTime
         val previousScheduledBackupTime = getPreviousAutoBackupTime().millis
         val missedPreviousBackup = previousRealBackupTime < previousScheduledBackupTime
