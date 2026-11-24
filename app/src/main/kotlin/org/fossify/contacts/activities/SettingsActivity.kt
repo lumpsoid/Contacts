@@ -55,6 +55,7 @@ class SettingsActivity : SimpleActivity() {
         setupShowContactsWithNumbers()
         setupStartNameWithSurname()
         setupMergeDuplicateContacts()
+        setupFindDuplicates()
         setupShowCallConfirmation()
         setupShowDialpadButton()
         setupShowPrivateContacts()
@@ -250,6 +251,12 @@ class SettingsActivity : SimpleActivity() {
         binding.settingsMergeDuplicateContactsHolder.setOnClickListener {
             binding.settingsMergeDuplicateContacts.toggle()
             config.mergeDuplicateContacts = binding.settingsMergeDuplicateContacts.isChecked
+        }
+    }
+
+    private fun setupFindDuplicates() {
+        binding.settingsFindDuplicatesHolder.setOnClickListener {
+            startActivity(Intent(this, DedupeActivity::class.java))
         }
     }
 

@@ -167,6 +167,21 @@
             </RelativeLayout>
 
             <RelativeLayout
+                android:id="@+id/settings_find_duplicates_holder"
+                style="@style/SettingsHolderTextViewOneLinerStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_find_duplicates_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/find_and_merge_duplicates" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
                 android:id="@+id/settings_show_call_confirmation_holder"
                 style="@style/SettingsHolderSwitchStyle"
                 android:layout_width="match_parent"
