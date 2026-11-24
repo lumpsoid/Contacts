@@ -12,6 +12,7 @@ import org.fossify.contacts.activities.SimpleActivity
 import org.fossify.contacts.adapters.FilterContactSourcesAdapter
 import org.fossify.contacts.databinding.DialogExportContactsBinding
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.extensions.getContactsWithNameless
 import java.io.File
 
 class ExportContactsDialog(
@@ -48,7 +49,7 @@ class ExportContactsDialog(
                 processDataIfReady(this)
             }
 
-            ContactsHelper(activity).getContacts(getAll = true) { contacts ->
+            activity.getContactsWithNameless(getAll = true) { contacts ->
                 contacts.mapTo(this@ExportContactsDialog.contacts) { it.copy() }
                 isContactsReady = true
                 processDataIfReady(this)
