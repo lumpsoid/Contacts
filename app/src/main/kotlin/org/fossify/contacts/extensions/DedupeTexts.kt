@@ -64,6 +64,7 @@ fun Context.failureText(reason: MergeFailure): String = getString(
         MergeFailure.WRITE_FAILED -> R.string.dedupe_fail_write
         MergeFailure.DELETE_FAILED -> R.string.dedupe_fail_delete
         MergeFailure.LINK_FAILED -> R.string.dedupe_fail_link
+        MergeFailure.ERROR -> R.string.dedupe_fail_error
     }
 )
 

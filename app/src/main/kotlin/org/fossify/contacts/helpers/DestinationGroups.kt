@@ -1,6 +1,7 @@
 package org.fossify.contacts.helpers
 
 import android.content.Context
+import android.database.Cursor
 import android.provider.ContactsContract.Groups
 import org.fossify.commons.extensions.groupsDB
 import org.fossify.commons.extensions.showErrorToast
@@ -37,14 +38,7 @@ class DestinationGroups(private val context: Context) {
         val selection = "${Groups.DELETED} = 0"
         try {
             context.contentResolver.query(Groups.CONTENT_URI, projection, selection, null, null)?.use {
-                while (it.moveToNext()) {
-                    val accountName = it.getString(ACCOUNT_NAME_COLUMN) ?: ""
-                    val accountType = it.getString(ACCOUNT_TYPE_COLUMN) ?: ""
-                    if (accountName == destination.name && accountType == destination.type) {
-                        val title = it.getString(TITLE_COLUMN) ?: ""
-                        groups.putIfAbsent(title, Group(it.getLong(ID_COLUMN), title))
-                    }
-                }
+                addGroupsOf(it, destination, groups)
             }
         } catch (e: SecurityException) {
             context.showErrorToast(e)
@@ -52,5 +46,17 @@ class DestinationGroups(private val context: Context) {
             context.showErrorToast(e)
         }
         return groups
+    }
+
+    /** Adds the groups of [destination] found in [cursor] to [groups], keeping the first of each title. */
+    private fun addGroupsOf(cursor: Cursor, destination: ContactSource, groups: MutableMap<String, Group>) {
+        while (cursor.moveToNext()) {
+            val accountName = cursor.getString(ACCOUNT_NAME_COLUMN) ?: ""
+            val accountType = cursor.getString(ACCOUNT_TYPE_COLUMN) ?: ""
+            if (accountName == destination.name && accountType == destination.type) {
+                val title = cursor.getString(TITLE_COLUMN) ?: ""
+                groups.putIfAbsent(title, Group(cursor.getLong(ID_COLUMN), title))
+            }
+        }
     }
 }

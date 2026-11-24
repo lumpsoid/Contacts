@@ -1,10 +1,12 @@
 package org.fossify.contacts.helpers
 
 import android.content.Context
+import android.database.SQLException
 import android.net.Uri
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.contacts.models.AccountAccess
+import org.fossify.contacts.models.MergeFailure
 import org.fossify.contacts.models.MergeOutcome
 import org.fossify.contacts.models.MergePlan
 import org.fossify.contacts.models.MergeRunResult
@@ -31,10 +33,34 @@ class MergeRunner(private val context: Context) {
             if (isCancelled()) {
                 break
             }
-            outcomes.add(writer.merge(plan, destination, access))
+            outcomes.add(mergeSafely(writer, plan, destination, access))
             onProgress(outcomes.size, plans.size)
         }
         return MergeRunResult.Finished(outcomes, backupUri, cancelled = outcomes.size < plans.size)
+    }
+
+    /** Merges [plan]; an unexpected error fails only this plan, so the rest of the run goes on. */
+    private fun mergeSafely(
+        writer: DedupeWriter,
+        plan: MergePlan,
+        destination: ContactSource,
+        access: AccountAccess
+    ): MergeOutcome {
+        return try {
+            writer.merge(plan, destination, access)
+        } catch (e: SQLException) {
+            context.showErrorToast(e)
+            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
+        } catch (e: IllegalStateException) {
+            context.showErrorToast(e)
+            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
+        } catch (e: IllegalArgumentException) {
+            context.showErrorToast(e)
+            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
+        } catch (e: SecurityException) {
+            context.showErrorToast(e)
+            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
+        }
     }
 
     private fun backUp(plans: List<MergePlan>, uri: Uri): Boolean {

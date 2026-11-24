@@ -145,6 +145,7 @@
     <string name="dedupe_fail_write">Could not save the merged contact; nothing was deleted</string>
     <string name="dedupe_fail_delete">Could not delete the old copies</string>
     <string name="dedupe_fail_link">Could not link to the messenger contacts</string>
+    <string name="dedupe_fail_error">An error stopped this merge; check this contact</string>
 
     <!-- FAQ -->
     <string name="faq_1_title">I want to change what fields are visible at contacts. Can I do it?</string>

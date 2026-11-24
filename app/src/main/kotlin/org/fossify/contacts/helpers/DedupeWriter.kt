@@ -2,6 +2,7 @@ package org.fossify.contacts.helpers
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.provider.ContactsContract.RawContacts
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.helpers.ContactsHelper
@@ -83,14 +84,7 @@ class DedupeWriter(private val context: Context) {
         val sortOrder = "${RawContacts._ID} DESC"
         try {
             context.contentResolver.query(RawContacts.CONTENT_URI, projection, selection, null, sortOrder)?.use {
-                while (it.moveToNext()) {
-                    val accountName = it.getString(ACCOUNT_NAME_COLUMN) ?: ""
-                    val accountType = it.getString(ACCOUNT_TYPE_COLUMN) ?: ""
-                    if (accountName == destination.name && accountType == destination.type) {
-                        newest = it.getInt(ID_COLUMN)
-                        break
-                    }
-                }
+                newest = firstOwnId(it, destination)
             }
         } catch (e: SecurityException) {
             context.showErrorToast(e)
@@ -98,6 +92,18 @@ class DedupeWriter(private val context: Context) {
             context.showErrorToast(e)
         }
         return newest
+    }
+
+    /** The id of the first row of [cursor] in the [destination] account, or 0 when there is none. */
+    private fun firstOwnId(cursor: Cursor, destination: ContactSource): Int {
+        while (cursor.moveToNext()) {
+            val accountName = cursor.getString(ACCOUNT_NAME_COLUMN) ?: ""
+            val accountType = cursor.getString(ACCOUNT_TYPE_COLUMN) ?: ""
+            if (accountName == destination.name && accountType == destination.type) {
+                return cursor.getInt(ID_COLUMN)
+            }
+        }
+        return 0
     }
 
     private fun readBack(id: Int, destination: ContactSource): Contact? {
