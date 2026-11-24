@@ -337,7 +337,7 @@ class SettingsActivity : SimpleActivity() {
 
     private fun importContacts() {
         FilePickerDialog(this) {
-            showImportContactsDialog(it) {}
+            showImportContactsDialog(it, onDismiss = {}) {}
         }
     }
 

@@ -35,6 +35,7 @@ import org.fossify.contacts.activities.ViewContactActivity
 import org.fossify.contacts.dialogs.ImportContactsDialog
 import org.fossify.contacts.helpers.ContactLinkHelper
 import org.fossify.contacts.helpers.DEFAULT_FILE_NAME
+import org.fossify.contacts.helpers.IMPORT_FILE_PREFIX
 import org.fossify.contacts.helpers.VcfExporter
 import java.io.IOException
 
@@ -209,16 +210,24 @@ fun Activity.editContact(contact: Contact) {
 
 fun SimpleActivity.tryImportContactsFromFile(uri: Uri, callback: (Boolean) -> Unit) {
     when (uri.scheme) {
-        "file" -> showImportContactsDialog(uri.path!!, callback)
+        "file" -> showImportContactsDialog(uri.path!!, onDismiss = {}, callback = callback)
         "content" -> {
             try {
-                val tempFile = copyUriToTempFile(uri, "import-${System.currentTimeMillis()}-$DEFAULT_FILE_NAME")
+                // Sweep copies left behind by a cancelled dialog, which never reaches the callback.
+                getTempFile(DEFAULT_FILE_NAME)?.parentFile?.listFiles { file ->
+                    file.name.startsWith(IMPORT_FILE_PREFIX)
+                }?.forEach { it.delete() }
+
+                val tempName = "$IMPORT_FILE_PREFIX${System.currentTimeMillis()}-$DEFAULT_FILE_NAME"
+                val tempFile = copyUriToTempFile(uri, tempName)
                 if (tempFile == null) {
                     toast(org.fossify.commons.R.string.unknown_error_occurred)
                     return
                 }
 
-                showImportContactsDialog(tempFile.absolutePath, callback)
+                showImportContactsDialog(tempFile.absolutePath, onDismiss = { tempFile.delete() }) { success ->
+                    callback(success)
+                }
             } catch (e: Exception) {
                 showErrorToast(e)
             }
@@ -228,6 +237,6 @@ fun SimpleActivity.tryImportContactsFromFile(uri: Uri, callback: (Boolean) -> Un
     }
 }
 
-fun SimpleActivity.showImportContactsDialog(path: String, callback: (Boolean) -> Unit) {
-    ImportContactsDialog(this, path, callback)
+fun SimpleActivity.showImportContactsDialog(path: String, onDismiss: () -> Unit, callback: (Boolean) -> Unit) {
+    ImportContactsDialog(this, path, onDismiss, callback)
 }

@@ -16,7 +16,12 @@ import org.fossify.contacts.extensions.showContactSourcePicker
 import org.fossify.contacts.helpers.VcfImporter
 import org.fossify.contacts.helpers.VcfImporter.ImportResult.IMPORT_FAIL
 
-class ImportContactsDialog(val activity: SimpleActivity, val path: String, private val callback: (refreshView: Boolean) -> Unit) {
+class ImportContactsDialog(
+    val activity: SimpleActivity,
+    val path: String,
+    private val onDismiss: () -> Unit,
+    private val callback: (refreshView: Boolean) -> Unit,
+) {
     private var targetContactSource = ""
     private var ignoreClicks = false
 
@@ -52,6 +57,7 @@ class ImportContactsDialog(val activity: SimpleActivity, val path: String, priva
         activity.getAlertDialogBuilder()
             .setPositiveButton(org.fossify.commons.R.string.ok, null)
             .setNegativeButton(org.fossify.commons.R.string.cancel, null)
+            .setOnDismissListener { onDismiss() }
             .apply {
                 activity.setupDialogStuff(binding.root, this, R.string.import_contacts) { alertDialog ->
                     alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
