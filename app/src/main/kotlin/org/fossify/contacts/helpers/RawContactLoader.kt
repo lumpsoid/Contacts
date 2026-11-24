@@ -133,10 +133,41 @@ class RawContactLoader(private val context: Context) {
             ) { cursor ->
                 val rawId = cursor.getIntValue(Data.RAW_CONTACT_ID)
                 val contact = contacts.getOrPut(rawId) { createContact(rawId, cursor) }
-                DATA_READERS[cursor.getStringValue(Data.MIMETYPE)]?.invoke(contact, cursor, storedGroups)
+                DATA_READERS[cursor.getStringValue(Data.MIMETYPE)]?.invoke(contact, cursor)
             }
         }
+        fillGroups(contacts.values, storedGroups)
         return contacts
+    }
+
+    /**
+     * Commons reads group membership per system contact and its updateContact rewrites it that way
+     * (deleting by CONTACT_ID), so a raw contact has to carry its whole system contact's groups too.
+     */
+    private fun fillGroups(contacts: Collection<Contact>, storedGroups: List<Group>) {
+        val contactIds = contacts.map { it.contactId }.filter { it != 0 }.distinct()
+        if (contactIds.isEmpty() || storedGroups.isEmpty()) {
+            return
+        }
+
+        val memberships = HashMap<Int, LinkedHashSet<Long>>()
+        val projection = arrayOf(Data.CONTACT_ID, CommonDataKinds.GroupMembership.GROUP_ROW_ID)
+        contactIds.chunked(IDS_PER_QUERY).forEach { chunk ->
+            val selection = "${Data.MIMETYPE} = ? AND ${Data.CONTACT_ID} IN (${chunk.joinToString(",") { "?" }})"
+            val selectionArgs = arrayOf(CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE) +
+                chunk.map { it.toString() }
+            context.queryCursor(Data.CONTENT_URI, projection, selection, selectionArgs, showErrors = true) { cursor ->
+                memberships.getOrPut(cursor.getIntValue(Data.CONTACT_ID)) { LinkedHashSet() }
+                    .add(cursor.getLongValue(CommonDataKinds.GroupMembership.GROUP_ROW_ID))
+            }
+        }
+
+        contacts.forEach { contact ->
+            val groupIds = memberships[contact.contactId].orEmpty()
+            storedGroups
+                .filter { group -> group.id?.let { groupIds.contains(it) } == true }
+                .forEach { contact.groups.add(Group(it.id, it.title)) }
+        }
     }
 }
 
@@ -161,7 +192,7 @@ fun addNamelessContacts(
     return ArrayList(listed + shown)
 }
 
-private typealias DataReader = (contact: Contact, cursor: Cursor, storedGroups: List<Group>) -> Unit
+private typealias DataReader = (contact: Contact, cursor: Cursor) -> Unit
 
 private val DATA_PROJECTION = arrayOf(
     Data.RAW_CONTACT_ID,
@@ -197,7 +228,7 @@ private fun createContact(rawId: Int, cursor: Cursor) = Contact(
 )
 
 private val DATA_READERS = mapOf<String, DataReader>(
-    CommonDataKinds.Phone.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Phone.CONTENT_ITEM_TYPE to { contact, cursor ->
         val number = cursor.getStringValue(CommonDataKinds.Phone.NUMBER)
         if (number != null) {
             val normalized = cursor.getStringValue(CommonDataKinds.Phone.NORMALIZED_NUMBER)
@@ -208,7 +239,7 @@ private val DATA_READERS = mapOf<String, DataReader>(
             contact.phoneNumbers.add(PhoneNumber(number, type, label, normalized, isPrimary))
         }
     },
-    CommonDataKinds.Email.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Email.CONTENT_ITEM_TYPE to { contact, cursor ->
         val email = cursor.getStringValue(CommonDataKinds.Email.DATA)
         if (email != null) {
             val type = cursor.getIntValue(CommonDataKinds.Email.TYPE)
@@ -216,7 +247,7 @@ private val DATA_READERS = mapOf<String, DataReader>(
             contact.emails.add(Email(email, type, label))
         }
     },
-    CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE to { contact, cursor ->
         val address = cursor.getStringValue(CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS)
         if (address != null) {
             contact.addresses.add(
@@ -235,7 +266,7 @@ private val DATA_READERS = mapOf<String, DataReader>(
             )
         }
     },
-    CommonDataKinds.Im.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Im.CONTENT_ITEM_TYPE to { contact, cursor ->
         val im = cursor.getStringValue(CommonDataKinds.Im.DATA)
         if (im != null) {
             val type = cursor.getIntValue(CommonDataKinds.Im.PROTOCOL)
@@ -243,42 +274,35 @@ private val DATA_READERS = mapOf<String, DataReader>(
             contact.IMs.add(IM(im, type, label))
         }
     },
-    CommonDataKinds.Event.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Event.CONTENT_ITEM_TYPE to { contact, cursor ->
         val startDate = cursor.getStringValue(CommonDataKinds.Event.START_DATE)
         if (startDate != null) {
             contact.events.add(Event(startDate, cursor.getIntValue(CommonDataKinds.Event.TYPE)))
         }
     },
-    CommonDataKinds.Note.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Note.CONTENT_ITEM_TYPE to { contact, cursor ->
         val note = cursor.getStringValue(CommonDataKinds.Note.NOTE)
         if (note != null) {
             contact.notes = note
         }
     },
-    CommonDataKinds.Nickname.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Nickname.CONTENT_ITEM_TYPE to { contact, cursor ->
         val nickname = cursor.getStringValue(CommonDataKinds.Nickname.NAME)
         if (nickname != null) {
             contact.nickname = nickname
         }
     },
-    CommonDataKinds.Organization.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Organization.CONTENT_ITEM_TYPE to { contact, cursor ->
         val company = cursor.getStringValue(CommonDataKinds.Organization.COMPANY) ?: ""
         val title = cursor.getStringValue(CommonDataKinds.Organization.TITLE) ?: ""
         if (company.isNotEmpty() || title.isNotEmpty()) {
             contact.organization = Organization(company, title)
         }
     },
-    CommonDataKinds.Website.CONTENT_ITEM_TYPE to { contact, cursor, _ ->
+    CommonDataKinds.Website.CONTENT_ITEM_TYPE to { contact, cursor ->
         val url = cursor.getStringValue(CommonDataKinds.Website.URL)
         if (url != null) {
             contact.websites.add(url)
-        }
-    },
-    CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE to { contact, cursor, storedGroups ->
-        val groupId = cursor.getLongValue(CommonDataKinds.GroupMembership.GROUP_ROW_ID)
-        val group = storedGroups.firstOrNull { it.id == groupId }
-        if (group != null) {
-            contact.groups.add(Group(groupId, group.title))
         }
     }
 )
