@@ -109,9 +109,13 @@ class MergeTargetsTest {
     fun aPrivateRecordIsNeverLinked() {
         val target = record(1, "Google")
         val whatsApp = record(3, "WhatsApp", type = "com.whatsapp", access = AccountAccess.READ_ONLY)
-        val secret = record(4, SMT_PRIVATE, access = AccountAccess.READ_ONLY)
-        val plan = mergePlan(MergeKind.DUPLICATES, target, whatsApp, secret)
+        val secret = record(4, SMT_PRIVATE)
+        val plan = mergePlan(MergeKind.SPLIT_DETAILS, target, whatsApp, secret)
         assertEquals(listOf(3), rawIdsToLink(plan, target))
+
+        val device = record(5, "B")
+        val withDevice = mergePlan(MergeKind.SPLIT_DETAILS, target, whatsApp, secret, device)
+        assertEquals(listOf(3, 5), rawIdsToLink(withDevice, target))
     }
 
     @Test
