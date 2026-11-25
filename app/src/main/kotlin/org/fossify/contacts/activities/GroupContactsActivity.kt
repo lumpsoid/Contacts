@@ -197,8 +197,10 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     override fun removeFromGroup(contacts: ArrayList<Contact>) {
         ensureBackgroundThread {
             removeContactsFromGroup(contacts, group.id!!)
-            if (groupContacts.size == contacts.size) {
-                refreshContacts()
+            runOnUiThread {
+                if (!isDestroyed && !isFinishing) {
+                    refreshContacts()
+                }
             }
         }
     }
