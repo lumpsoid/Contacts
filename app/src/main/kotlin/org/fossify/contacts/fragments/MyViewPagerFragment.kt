@@ -359,6 +359,10 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
     }
 
     fun onSearchClosed() {
+        if (this is FavoritesFragment) {
+            contactsIgnoringSearch = contactsIgnoringSearch.filter { it.starred == 1 }
+        }
+
         if (innerBinding.fragmentList.adapter is ContactsAdapter) {
             (innerBinding.fragmentList.adapter as? ContactsAdapter)?.updateItems(contactsIgnoringSearch)
             setupLetterFastscroller(contactsIgnoringSearch)
