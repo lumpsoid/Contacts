@@ -150,7 +150,7 @@ class ViewContactActivity : ContactActivity() {
         if (contactId == 0 && isViewIntent) {
             val data = intent.data
             if (data != null) {
-                val rawId = if (data.path!!.contains("lookup")) {
+                val rawId = if (data.path?.contains("lookup") == true) {
                     val lookupKey = getLookupKeyFromUri(data)
                     if (lookupKey != null) {
                         contact = ContactsHelper(this).getContactWithLookupKey(lookupKey)
