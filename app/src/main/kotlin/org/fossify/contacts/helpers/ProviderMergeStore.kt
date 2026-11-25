@@ -60,7 +60,7 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
     }
 
     override fun insert(merged: Contact, destination: ContactSource): List<Int>? {
-        val before = newestRecordId(destination)
+        val before = context.newestRecordId(destination)
         if (!ContactsHelper(context).insertContact(merged)) {
             // Commons can fail after its batch already created the raw contact; remove it when it is the only new one.
             val created = recordIdsAfter(before, destination)
@@ -151,28 +151,28 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         }
         return ids
     }
+}
 
-    /** Highest raw id in [destination]'s store; every record inserted later is above it. */
-    private fun newestRecordId(destination: ContactSource): Int {
-        if (destination.type == SMT_PRIVATE) {
-            val db = ContactsDatabase.getInstance(context.applicationContext).openHelper.readableDatabase
-            return db.query("SELECT MAX(id) FROM contacts").use {
-                if (it.moveToFirst()) it.getInt(ID_COLUMN) else 0
-            }
+/** Highest raw id in [destination]'s store; every record inserted later is above it. */
+private fun Context.newestRecordId(destination: ContactSource): Int {
+    if (destination.type == SMT_PRIVATE) {
+        val db = ContactsDatabase.getInstance(applicationContext).openHelper.readableDatabase
+        return db.query("SELECT MAX(id) FROM contacts").use {
+            if (it.moveToFirst()) it.getInt(ID_COLUMN) else 0
         }
-        val projection = arrayOf(RawContacts._ID)
-        val sortOrder = "${RawContacts._ID} DESC"
-        return try {
-            context.contentResolver.query(RawContacts.CONTENT_URI, projection, null, null, sortOrder)?.use {
-                if (it.moveToFirst()) it.getInt(ID_COLUMN) else 0
-            } ?: 0
-        } catch (e: SecurityException) {
-            context.showErrorToast(e)
-            0
-        } catch (e: IllegalArgumentException) {
-            context.showErrorToast(e)
-            0
-        }
+    }
+    val projection = arrayOf(RawContacts._ID)
+    val sortOrder = "${RawContacts._ID} DESC"
+    return try {
+        contentResolver.query(RawContacts.CONTENT_URI, projection, null, null, sortOrder)?.use {
+            if (it.moveToFirst()) it.getInt(ID_COLUMN) else 0
+        } ?: 0
+    } catch (e: SecurityException) {
+        showErrorToast(e)
+        0
+    } catch (e: IllegalArgumentException) {
+        showErrorToast(e)
+        0
     }
 }
 
