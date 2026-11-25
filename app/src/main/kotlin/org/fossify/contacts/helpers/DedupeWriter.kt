@@ -21,22 +21,44 @@ class DedupeWriter(private val store: MergeStore) {
         val merged = buildMergedContact(base, plan.records, plan.choices)
         val isPrivate = destination.type == SMT_PRIVATE
         val sendToVoicemail = !isPrivate && store.sendsToVoicemail(deviceRawIds(plan))
-        val failure = if (!access.fits(merged)) {
-            MergeFailure.SIM_LIMIT
-        } else {
-            merged.groups = store.groupsFor(destination, merged.groups.map { it.title })
-            val resultId = writeVerified(merged, target, destination)
-            when {
-                resultId == null -> MergeFailure.WRITE_FAILED
-                !store.delete(recordsToDelete(plan, target).map { it.contact }) -> MergeFailure.DELETE_FAILED
-                !link(resultId, isPrivate, rawIdsToLink(plan, target)) -> MergeFailure.LINK_FAILED
-                else -> {
-                    if (sendToVoicemail) store.setSendToVoicemail(resultId)
-                    null
-                }
-            }
+        val failure = when {
+            !access.fits(merged) -> MergeFailure.SIM_LIMIT
+            !placePhoto(merged, isPrivate) -> MergeFailure.WRITE_FAILED
+            else -> writeAndClean(plan, merged, target, destination, isPrivate, sendToVoicemail)
         }
         return if (failure == null) MergeOutcome.Merged(plan.key) else MergeOutcome.Failed(plan.key, failure)
+    }
+
+    /** Writes [merged], then deletes the old copies and links the rest; null when all of it succeeded. */
+    private fun writeAndClean(
+        plan: MergePlan,
+        merged: Contact,
+        target: MergeRecord?,
+        destination: ContactSource,
+        isPrivate: Boolean,
+        sendToVoicemail: Boolean
+    ): MergeFailure? {
+        merged.groups = store.groupsFor(destination, merged.groups.map { it.title })
+        val resultId = writeVerified(merged, target, destination)
+        return when {
+            resultId == null -> MergeFailure.WRITE_FAILED
+            !store.delete(recordsToDelete(plan, target).map { it.contact }) -> MergeFailure.DELETE_FAILED
+            !link(resultId, isPrivate, rawIdsToLink(plan, target)) -> MergeFailure.LINK_FAILED
+            else -> {
+                if (sendToVoicemail) store.setSendToVoicemail(resultId)
+                null
+            }
+        }
+    }
+
+    /** Gives [merged] a photo uri when it is a bitmap for a device account; false when saving failed. */
+    private fun placePhoto(merged: Contact, isPrivate: Boolean): Boolean {
+        val photo = merged.photo ?: return true
+        if (!needsPhotoFile(merged.photoUri, hasBitmap = true, toPrivate = isPrivate)) return true
+        val uri = store.savePhoto(photo) ?: return false
+        merged.photoUri = uri
+        merged.thumbnailUri = uri
+        return true
     }
 
     /** Updates [target] or inserts [merged] new, and returns its id only when reading it back verifies. */

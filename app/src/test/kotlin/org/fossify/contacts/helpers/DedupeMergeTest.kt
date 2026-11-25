@@ -113,4 +113,12 @@ class DedupeMergeTest {
         val merged = buildMergedContact(first.contact, listOf(first, second), choices)
         assertEquals(listOf(Event("1991-02-02", TYPE_BIRTHDAY)), merged.events)
     }
+
+    @Test
+    fun onlyABitmapPhotoBoundForADeviceAccountNeedsAFile() {
+        assertTrue(needsPhotoFile("", hasBitmap = true, toPrivate = false))
+        assertFalse(needsPhotoFile("content://photo", hasBitmap = true, toPrivate = false))
+        assertFalse(needsPhotoFile("", hasBitmap = true, toPrivate = true))
+        assertFalse(needsPhotoFile("", hasBitmap = false, toPrivate = false))
+    }
 }

@@ -3,7 +3,9 @@ package org.fossify.contacts.helpers
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
+import android.graphics.Bitmap
 import android.provider.ContactsContract.RawContacts
+import org.fossify.commons.extensions.getCachePhoto
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.helpers.ContactsHelper
 import org.fossify.commons.helpers.LocalContactsHelper
@@ -11,11 +13,15 @@ import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
+import org.fossify.contacts.extensions.getCachePhotoUri
 import org.fossify.contacts.models.MergeRecord
+import java.io.FileOutputStream
+import java.io.IOException
 
 private const val ID_COLUMN = 0
 private const val ACCOUNT_NAME_COLUMN = 1
 private const val ACCOUNT_TYPE_COLUMN = 2
+private const val PHOTO_QUALITY = 100
 
 /**
  * [MergeStore] over the system contacts provider and the private contacts database.
@@ -24,6 +30,18 @@ private const val ACCOUNT_TYPE_COLUMN = 2
 class ProviderMergeStore(private val context: Context) : MergeStore {
     override fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group> {
         return DestinationGroups(context).groupsFor(destination, titles)
+    }
+
+    override fun savePhoto(photo: Bitmap): String? = try {
+        val file = context.getCachePhoto()
+        FileOutputStream(file).use { photo.compress(Bitmap.CompressFormat.JPEG, PHOTO_QUALITY, it) }
+        context.getCachePhotoUri(file).toString()
+    } catch (e: IOException) {
+        context.showErrorToast(e)
+        null
+    } catch (e: IllegalArgumentException) {
+        context.showErrorToast(e)
+        null
     }
 
     override fun update(merged: Contact, target: MergeRecord): Boolean {

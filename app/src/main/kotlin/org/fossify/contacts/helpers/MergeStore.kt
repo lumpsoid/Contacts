@@ -1,5 +1,6 @@
 package org.fossify.contacts.helpers
 
+import android.graphics.Bitmap
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
@@ -9,6 +10,9 @@ import org.fossify.contacts.models.MergeRecord
 interface MergeStore {
     /** Groups of [destination] titled [titles], created where missing. */
     fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group>
+
+    /** Saves [photo] to a file this app shares; its uri, or null when it could not be saved. */
+    fun savePhoto(photo: Bitmap): String?
 
     /** Writes [merged] over the stored [target]; false when the write failed. */
     fun update(merged: Contact, target: MergeRecord): Boolean

@@ -103,3 +103,7 @@ private fun mergedPhoneNumbers(contacts: List<Contact>): ArrayList<PhoneNumber> 
     }
     return numbers
 }
+
+/** Whether a merged photo held only as a bitmap must be saved to a file first: device accounts read only the uri. */
+fun needsPhotoFile(photoUri: String, hasBitmap: Boolean, toPrivate: Boolean) =
+    hasBitmap && photoUri.isEmpty() && !toPrivate
