@@ -60,7 +60,7 @@ class NamelessRulesTest {
     @Test
     fun ignoredSourcesDisableMergeAndNumberFilter() {
         val rules = namelessRules(
-            getAll = true,
+            getAll = false,
             ignoredContactSources = setOf("acc:type"),
             mergeDuplicates = true,
             showOnlyWithNumbers = true

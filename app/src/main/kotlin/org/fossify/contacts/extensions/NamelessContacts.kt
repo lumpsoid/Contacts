@@ -34,9 +34,15 @@ fun Context.getContactsWithNameless(
     showOnlyContactsWithNumbers: Boolean = config.showOnlyContactsWithNumbers,
     callback: (ArrayList<Contact>) -> Unit
 ) {
+    val rules = namelessRules(
+        getAll = getAll,
+        ignoredContactSources = ignoredContactSources,
+        mergeDuplicates = config.mergeDuplicateContacts,
+        showOnlyWithNumbers = showOnlyContactsWithNumbers
+    )
     // commons merges same-name contacts only in this case; merge here instead,
     // so contacts the system keeps apart stay apart
-    val mergeByName = config.mergeDuplicateContacts && ignoredContactSources.isEmpty() && !getAll
+    val mergeByName = rules.mergeLinked
     val loadAll = getAll || mergeByName
     ContactsHelper(this).getContacts(loadAll, false, ignoredContactSources, showOnlyContactsWithNumbers) { contacts ->
         ensureBackgroundThread {
@@ -50,12 +56,6 @@ fun Context.getContactsWithNameless(
             } else {
                 contacts
             }
-            val rules = namelessRules(
-                getAll = getAll,
-                ignoredContactSources = ignoredContactSources,
-                mergeDuplicates = config.mergeDuplicateContacts,
-                showOnlyWithNumbers = showOnlyContactsWithNumbers
-            )
             val namelessIgnored = if (getAll) ignoredContactSources else baseConfig.ignoredContactSources
             val result = addNamelessContacts(
                 listed = listed,

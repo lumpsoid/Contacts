@@ -213,7 +213,10 @@ fun addNamelessContacts(
     return ArrayList(listed + shown)
 }
 
-/** How nameless contacts join a list; mirrors commons ContactsHelper.getContacts for named ones. */
+/**
+ * How nameless contacts join a list; mirrors commons ContactsHelper.getContacts for named ones.
+ * [mergeLinked] also decides whether named contacts are merged by name (getContactsWithNameless).
+ */
 data class NamelessRules(val mergeLinked: Boolean, val onlyWithNumbers: Boolean)
 
 fun namelessRules(
