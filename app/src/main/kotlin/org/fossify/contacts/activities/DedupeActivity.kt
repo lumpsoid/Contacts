@@ -180,7 +180,11 @@ class DedupeActivity : SimpleActivity() {
     /** Merges on a background thread through [MergeSession]; leaving the screen does not stop or drop the run. */
     private fun startRun(destination: Pair<ContactSource, AccountAccess>, backupUri: Uri?) {
         val plans = selection?.plans().orEmpty()
-        val labels = MergeSession.Labels(selection?.planNames().orEmpty(), destination.first.publicName, backupUri)
+        val labels = MergeSession.Labels(
+            selection?.result?.planNames().orEmpty(),
+            destination.first.publicName,
+            backupUri,
+        )
         val store = ProviderMergeStore(applicationContext)
         val runner = MergeRunner(store) { applicationContext.showErrorToast(it) }
         val backUp = backupUri?.let { uri ->
