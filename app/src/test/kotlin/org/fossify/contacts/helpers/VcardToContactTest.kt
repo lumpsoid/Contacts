@@ -379,6 +379,23 @@ class VcardToContactTest {
     }
 
     @Test
+    fun vcard3CarAndIsdnPhonesAreRead() {
+        val phones = parse(
+            """
+            BEGIN:VCARD
+            VERSION:3.0
+            TEL;TYPE=CAR:+1
+            TEL;TYPE=ISDN:+2
+            END:VCARD
+            """
+        ).contact.phoneNumbers
+        assertEquals(CommonDataKinds.Phone.TYPE_CAR, phones[0].type)
+        assertEquals(CommonDataKinds.Phone.TYPE_ISDN, phones[1].type)
+        assertEquals("", phones[0].label)
+        assertEquals("", phones[1].label)
+    }
+
+    @Test
     fun nonIntegerPrefParamDoesNotThrow() {
         val phone = parse(
             """

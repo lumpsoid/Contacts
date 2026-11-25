@@ -106,6 +106,26 @@ class VcardRoundTripTest {
     }
 
     @Test
+    fun phoneTypesWithNoVcardNameSurvive() {
+        val phones = arrayListOf(
+            PhoneNumber("+1", CommonDataKinds.Phone.TYPE_CAR, "", "+1"),
+            PhoneNumber("+2", CommonDataKinds.Phone.TYPE_ISDN, "", "+2"),
+            PhoneNumber("+3", CommonDataKinds.Phone.TYPE_ASSISTANT, "", "+3"),
+            PhoneNumber("+4", CommonDataKinds.Phone.TYPE_CALLBACK, "", "+4"),
+            PhoneNumber("+5", CommonDataKinds.Phone.TYPE_COMPANY_MAIN, "", "+5"),
+            PhoneNumber("+6", CommonDataKinds.Phone.TYPE_RADIO, "", "+6"),
+            PhoneNumber("+7", CommonDataKinds.Phone.TYPE_TELEX, "", "+7"),
+            PhoneNumber("+8", CommonDataKinds.Phone.TYPE_TTY_TDD, "", "+8"),
+            PhoneNumber("+9", CommonDataKinds.Phone.TYPE_MMS, "", "+9"),
+            PhoneNumber("+10", CommonDataKinds.Phone.TYPE_OTHER_FAX, "", "+10"),
+            PhoneNumber("+11", CommonDataKinds.Phone.TYPE_WORK_MOBILE, "", "+11"),
+            PhoneNumber("+12", CommonDataKinds.Phone.TYPE_WORK_PAGER, "", "+12"),
+        )
+        val contact = Contact(id = 0, contactId = 0, firstName = "Ann", phoneNumbers = phones)
+        assertEquals(phones, roundTrip(contact).contact.phoneNumbers)
+    }
+
+    @Test
     fun notesAndOrganizationSurvive() {
         val contact = Contact(
             id = 0,
