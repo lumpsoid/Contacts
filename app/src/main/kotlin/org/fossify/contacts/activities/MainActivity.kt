@@ -427,7 +427,9 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             },
             tabSelectedAction = {
                 binding.viewPager.currentItem = it.position
-                getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
+                if (binding.mainMenu.isSearchOpen) {
+                    getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
+                }
                 updateBottomTabItemColors(it.customView, true, getSelectedTabDrawableIds()[it.position])
             }
         )
@@ -519,9 +521,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
 
             if (refreshTabsMask and TAB_GROUPS != 0) {
                 findViewById<MyViewPagerFragment<*>>(R.id.groups_fragment)?.apply {
-                    if (refreshTabsMask == TAB_GROUPS) {
-                        skipHashComparing = true
-                    }
+                    skipHashComparing = true
                     refreshContacts(contacts)
                 }
             }
