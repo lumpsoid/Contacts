@@ -8,6 +8,7 @@ import org.fossify.contacts.models.MatchConfidence
 import org.fossify.contacts.models.MergeRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -99,6 +100,13 @@ class DuplicateScanTest {
             VISIBLE
         )
         assertEquals(1, result.duplicates.size)
+    }
+
+    @Test
+    fun kanaVoicingMarksAreKept() {
+        // U+304C is が; its NFD form is か followed by the voicing mark U+3099.
+        assertNotEquals(normalizeName("か"), normalizeName("が"))
+        assertEquals(normalizeName("が"), normalizeName("が"))
     }
 
     @Test

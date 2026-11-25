@@ -9,7 +9,8 @@ import org.fossify.contacts.models.SplitDetail
 import java.text.Normalizer
 import java.util.Locale
 
-private val COMBINING_MARKS = Regex("\\p{Mn}+")
+// Latin, Greek and Cyrillic accents only: kana voicing marks (U+3099, U+309A) change the name.
+private val COMBINING_MARKS = Regex("[\\u0300-\\u036F]+")
 private val WHITESPACE = Regex("\\s+")
 
 /** Lower-case, accent-free, word-order-free form of a name: "Petrová Anna" -> "anna petrova". */
