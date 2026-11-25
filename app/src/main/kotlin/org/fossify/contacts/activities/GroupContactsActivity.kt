@@ -25,11 +25,13 @@ import org.fossify.contacts.helpers.LOCATION_GROUP_CONTACTS
 import org.fossify.contacts.helpers.inSources
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import org.fossify.contacts.interfaces.RemoveFromGroupListener
+import java.util.concurrent.atomic.AtomicInteger
 
 class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, RefreshContactsListener {
     private var allContacts = ArrayList<Contact>()
     private var groupContacts = ArrayList<Contact>()
     private var wasInit = false
+    private val loadGeneration = AtomicInteger()
     private val binding by viewBinding(ActivityGroupContactsBinding::inflate)
     lateinit var group: Group
 
@@ -111,6 +113,7 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     }
 
     private fun refreshContacts() {
+        val generation = loadGeneration.incrementAndGet()
         getContactsWithNameless { contacts ->
             ensureBackgroundThread {
                 val visible = contacts.inSources(getVisibleContactSources())
@@ -118,11 +121,11 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
                     contact.groups.any { it.id == group.id }
                 }
                 runOnUiThread {
-                    if (isDestroyed || isFinishing) {
+                    if (isDestroyed || isFinishing || generation != loadGeneration.get()) {
                         return@runOnUiThread
                     }
                     wasInit = true
-                    allContacts = contacts
+                    allContacts = visible
                     groupContacts = inGroup
                     binding.groupContactsPlaceholder2.beVisibleIf(groupContacts.isEmpty())
                     binding.groupContactsPlaceholder.beVisibleIf(groupContacts.isEmpty())
