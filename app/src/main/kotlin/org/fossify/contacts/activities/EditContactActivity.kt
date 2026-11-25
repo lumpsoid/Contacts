@@ -231,7 +231,7 @@ class EditContactActivity : ContactActivity() {
             if (data != null && data.path != null) {
                 val rawId = if (data.path!!.contains("lookup")) {
                     if (data.pathSegments.last().startsWith("local_")) {
-                        data.path!!.substringAfter("local_").toInt()
+                        data.path!!.substringAfter("local_").toIntOrNull() ?: -1
                     } else {
                         getLookupUriRawId(data)
                     }
@@ -249,9 +249,11 @@ class EditContactActivity : ContactActivity() {
             ensureBackgroundThread {
                 contact = getContactWithIdOrRaw(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
                 if (contact == null) {
-                    toast(org.fossify.commons.R.string.unknown_error_occurred)
-                    hideKeyboard()
-                    finish()
+                    runOnUiThread {
+                        toast(org.fossify.commons.R.string.unknown_error_occurred)
+                        hideKeyboard()
+                        finish()
+                    }
                 } else {
                     runOnUiThread {
                         gotContact()
