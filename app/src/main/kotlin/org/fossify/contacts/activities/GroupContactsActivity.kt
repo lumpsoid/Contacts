@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.ContactsHelper
+import org.fossify.commons.helpers.LocalContactsHelper
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.contacts.Contact
@@ -217,8 +218,16 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     }
 
     private fun setRingtoneOnSelected(uri: Uri) {
-        groupContacts.forEach {
-            ContactsHelper(this).updateRingtone(it.contactId.toString(), uri.toString())
+        val contacts = ArrayList(groupContacts)
+        val ringtone = uri.toString()
+        ensureBackgroundThread {
+            contacts.forEach {
+                if (it.isPrivate()) {
+                    LocalContactsHelper(this).updateRingtone(it.contactId, ringtone)
+                } else {
+                    ContactsHelper(this).updateRingtone(it.contactId.toString(), ringtone)
+                }
+            }
         }
     }
 }
