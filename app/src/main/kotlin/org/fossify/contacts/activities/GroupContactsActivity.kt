@@ -21,6 +21,7 @@ import org.fossify.contacts.extensions.handleGenericContactClick
 import org.fossify.contacts.extensions.viewContact
 import org.fossify.contacts.helpers.GROUP
 import org.fossify.contacts.helpers.LOCATION_GROUP_CONTACTS
+import org.fossify.contacts.helpers.inSources
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import org.fossify.contacts.interfaces.RemoveFromGroupListener
 
@@ -109,15 +110,25 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     }
 
     private fun refreshContacts() {
-        getContactsWithNameless {
-            wasInit = true
-            allContacts = it
-
-            groupContacts = it.filter { it.groups.map { it.id }.contains(group.id) } as ArrayList<Contact>
-            binding.groupContactsPlaceholder2.beVisibleIf(groupContacts.isEmpty())
-            binding.groupContactsPlaceholder.beVisibleIf(groupContacts.isEmpty())
-            binding.groupContactsFastscroller.beVisibleIf(groupContacts.isNotEmpty())
-            updateContacts(groupContacts)
+        getContactsWithNameless { contacts ->
+            ensureBackgroundThread {
+                val visible = contacts.inSources(getVisibleContactSources())
+                val inGroup: ArrayList<Contact> = visible.filterTo(ArrayList()) { contact ->
+                    contact.groups.any { it.id == group.id }
+                }
+                runOnUiThread {
+                    if (isDestroyed || isFinishing) {
+                        return@runOnUiThread
+                    }
+                    wasInit = true
+                    allContacts = contacts
+                    groupContacts = inGroup
+                    binding.groupContactsPlaceholder2.beVisibleIf(groupContacts.isEmpty())
+                    binding.groupContactsPlaceholder.beVisibleIf(groupContacts.isEmpty())
+                    binding.groupContactsFastscroller.beVisibleIf(groupContacts.isNotEmpty())
+                    updateContacts(groupContacts)
+                }
+            }
         }
     }
 

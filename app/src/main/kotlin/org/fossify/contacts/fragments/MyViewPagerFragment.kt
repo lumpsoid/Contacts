@@ -33,6 +33,7 @@ import org.fossify.contacts.helpers.AVOID_CHANGING_VISIBILITY_TAG
 import org.fossify.contacts.helpers.Config
 import org.fossify.contacts.helpers.GROUP
 import org.fossify.contacts.helpers.distinctByLinkedContact
+import org.fossify.contacts.helpers.inSources
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import java.util.Locale
 
@@ -128,7 +129,7 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
 
         allContacts = contacts
         val filtered = when (this) {
-            is GroupsFragment -> contacts
+            is GroupsFragment -> contacts.inSources(activity!!.getVisibleContactSources())
             is FavoritesFragment -> {
                 val contactSources = activity!!.getVisibleContactSources()
                 val favouriteContacts = contacts
