@@ -44,6 +44,10 @@ private val extraPhoneTypeIdsByName =
     extraPhoneTypes.entries.associate { (typeId, name) -> name to typeId } +
         mapOf(CAR to Phone.TYPE_CAR, ISDN to Phone.TYPE_ISDN)
 
+/** The phone type for a TYPE name that has no branch of its own in [phoneTypeId], or a custom type if unknown. */
+private fun extraPhoneTypeId(name: String): Int =
+    extraPhoneTypeIdsByName[name.uppercase(Locale.ROOT)] ?: Phone.TYPE_CUSTOM
+
 internal fun phoneTypeId(type: String, subtype: String?): Int =
     when (type.uppercase(Locale.ROOT)) {
         CELL -> Phone.TYPE_MOBILE
@@ -69,7 +73,7 @@ internal fun phoneTypeId(type: String, subtype: String?): Int =
         FAX -> if (subtype?.uppercase(Locale.ROOT) == HOME) Phone.TYPE_FAX_HOME else Phone.TYPE_FAX_WORK
         PAGER -> Phone.TYPE_PAGER
         OTHER -> Phone.TYPE_OTHER
-        else -> extraPhoneTypeIdsByName[type.uppercase(Locale.ROOT)] ?: Phone.TYPE_CUSTOM
+        else -> extraPhoneTypeId(type)
     }
 
 internal fun emailTypeId(type: String): Int = when (type.uppercase(Locale.ROOT)) {
