@@ -5,16 +5,30 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import android.os.Binder
+import android.os.Process
 import com.google.gson.Gson
 import org.fossify.commons.helpers.LocalContactsHelper
 import org.fossify.commons.helpers.MyContactsContentProvider
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.helpers.certDigestsOf
+import org.fossify.contacts.helpers.certDigestsOfUid
+import org.fossify.contacts.helpers.isTrustedCaller
 
 class MyContactsContentProvider : ContentProvider() {
     override fun insert(uri: Uri, contentValues: ContentValues?) = null
 
+    /** Only this app and apps signed with Fossify's or this app's certificate may read private contacts. */
+    private fun isCallerTrusted(): Boolean {
+        val context = context ?: return false
+        val uid = Binder.getCallingUid()
+        if (uid == Process.myUid()) return true
+        val packageManager = context.packageManager
+        return isTrustedCaller(packageManager.certDigestsOfUid(uid), packageManager.certDigestsOf(context.packageName))
+    }
+
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? {
-        if (context == null || !context!!.config.showPrivateContacts) {
+        if (context == null || !context!!.config.showPrivateContacts || !isCallerTrusted()) {
             return null
         } else {
             val matrixCursor = MatrixCursor(
@@ -53,7 +67,7 @@ class MyContactsContentProvider : ContentProvider() {
 
     override fun onCreate() = true
 
-    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?) = 1
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?) = 0
 
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
 
