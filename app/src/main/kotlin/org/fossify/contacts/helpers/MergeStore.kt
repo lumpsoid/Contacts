@@ -8,8 +8,8 @@ import org.fossify.contacts.models.MergeRecord
 
 /** The contact storage a merge reads and writes: the system provider and this app's private database. */
 interface MergeStore {
-    /** Groups of [destination] titled [titles], created where missing. */
-    fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group>
+    /** Groups of [destination] titled [titles], created where missing; null when one could not be created. */
+    fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group>?
 
     /** Saves [photo] to a file this app shares; its uri, or null when it could not be saved. */
     fun savePhoto(photo: Bitmap): String?

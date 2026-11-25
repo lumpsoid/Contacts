@@ -28,7 +28,7 @@ private const val PHOTO_QUALITY = 100
  * Blocking; call off the main thread.
  */
 class ProviderMergeStore(private val context: Context) : MergeStore {
-    override fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group> {
+    override fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group>? {
         return DestinationGroups(context).groupsFor(destination, titles)
     }
 
@@ -44,10 +44,18 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         null
     }
 
+    /** Commons drops the group memberships of every raw contact linked to [target]; they are put back after. */
     override fun update(merged: Contact, target: MergeRecord): Boolean {
+        val memberships = GroupMemberships(context)
+        val linked = if (merged.isPrivate()) {
+            emptySet()
+        } else {
+            memberships.ofOthersLinkedTo(target.contact) ?: return false
+        }
         RawContactLoader(context).ensureNameRow(merged)
         val photo = photoUpdateStatus(target.contact.photoUri, merged.photoUri)
-        return ContactsHelper(context).updateContact(merged, photo)
+        if (!ContactsHelper(context).updateContact(merged, photo)) return false
+        return linked.isEmpty() || memberships.restore(target.contact, linked)
     }
 
     override fun insert(merged: Contact, destination: ContactSource): Int? {

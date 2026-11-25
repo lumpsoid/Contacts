@@ -17,16 +17,17 @@ private const val ACCOUNT_TYPE_COLUMN = 3
 
 /** The groups of one account, by title, creating the missing ones. */
 class DestinationGroups(private val context: Context) {
-    /** Groups of [destination] titled [titles], created where missing. Blocking. */
-    fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group> {
+    /** Groups of [destination] titled [titles], created where missing; null when one could not be created. Blocking. */
+    fun groupsFor(destination: ContactSource, titles: List<String>): ArrayList<Group>? {
         if (titles.isEmpty()) {
             return ArrayList()
         }
         val existing = groupsOf(destination)
         val helper = ContactsHelper(context)
-        return ArrayList(titles.distinct().mapNotNull { title ->
+        val groups = titles.distinct().map { title ->
             existing[title] ?: helper.createNewGroup(title, destination.name, destination.type)
-        })
+        }
+        return if (groups.any { it == null }) null else ArrayList(groups.filterNotNull())
     }
 
     private fun groupsOf(destination: ContactSource): Map<String, Group> {

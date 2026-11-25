@@ -38,7 +38,7 @@ class DedupeWriter(private val store: MergeStore) {
         isPrivate: Boolean,
         sendToVoicemail: Boolean
     ): MergeFailure? {
-        merged.groups = store.groupsFor(destination, merged.groups.map { it.title })
+        merged.groups = store.groupsFor(destination, merged.groups.map { it.title }) ?: return MergeFailure.WRITE_FAILED
         val resultId = writeVerified(merged, target, destination)
         return when {
             resultId == null -> MergeFailure.WRITE_FAILED
