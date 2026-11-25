@@ -40,11 +40,11 @@ class DuplicateScanner(private val context: Context) {
     }
 
     private fun toRecords(contacts: List<Contact>): List<MergeRecord> {
-        val types = ContactsHelper(context).getDeviceContactSources().associate { it.name to it.type }
+        val sources = ContactsHelper(context).getDeviceContactSources().toList()
         val readOnly = readOnlyAdapterTypes()
         return contacts.map { contact ->
-            val type = if (contact.isPrivate()) SMT_PRIVATE else types[contact.source] ?: ""
-            MergeRecord(contact, type, AccountAccess.of(type, readOnly))
+            val type = if (contact.isPrivate()) SMT_PRIVATE else accountTypeOf(contact.source, sources)
+            MergeRecord(contact, type ?: "", AccountAccess.of(type, readOnly))
         }
     }
 
@@ -53,3 +53,7 @@ class DuplicateScanner(private val context: Context) {
         .map { it.accountType }
         .toSet()
 }
+
+/** The type of the account named [name] among [sources]; null when none or several types carry that name. */
+fun accountTypeOf(name: String, sources: List<ContactSource>): String? =
+    sources.filter { it.name == name }.map { it.type }.distinct().singleOrNull()
