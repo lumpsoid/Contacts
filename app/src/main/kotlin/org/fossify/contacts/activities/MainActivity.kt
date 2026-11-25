@@ -34,6 +34,7 @@ import org.fossify.contacts.extensions.tryImportContactsFromFile
 import org.fossify.contacts.fragments.FavoritesFragment
 import org.fossify.contacts.fragments.MyViewPagerFragment
 import org.fossify.contacts.helpers.ALL_TABS_MASK
+import org.fossify.contacts.helpers.RefreshQueue
 import org.fossify.contacts.helpers.tabsList
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import java.util.Arrays
@@ -41,7 +42,7 @@ import java.util.Arrays
 class MainActivity : SimpleActivity(), RefreshContactsListener {
     private var werePermissionsHandled = false
     private var isFirstResume = true
-    private var isGettingContacts = false
+    private val refreshQueue = RefreshQueue()
 
     private var storedShowContactThumbnails = false
     private var storedShowPhoneNumbers = false
@@ -483,11 +484,13 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
     }
 
     override fun refreshContacts(refreshTabsMask: Int) {
-        if (isDestroyed || isFinishing || isGettingContacts) {
+        if (isDestroyed || isFinishing) {
             return
         }
 
-        isGettingContacts = true
+        if (!refreshQueue.request(refreshTabsMask)) {
+            return
+        }
 
         if (binding.viewPager.adapter == null) {
             binding.viewPager.adapter = ViewPagerAdapter(this, tabsList, config.showTabs)
@@ -495,7 +498,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         }
 
         getContactsWithNameless { contacts ->
-            isGettingContacts = false
+            val nextMask = refreshQueue.finish()
             if (isDestroyed || isFinishing) {
                 return@getContactsWithNameless
             }
@@ -525,6 +528,10 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
 
             if (binding.mainMenu.isSearchOpen) {
                 getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
+            }
+
+            if (nextMask != 0) {
+                refreshContacts(nextMask)
             }
         }
     }
