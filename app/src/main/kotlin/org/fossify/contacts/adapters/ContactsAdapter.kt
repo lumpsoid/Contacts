@@ -241,7 +241,8 @@ class ContactsAdapter(
 
                 val matches = contactsToRemove.flatMap { contactToRemove ->
                     val sameName = allContacts.filter {
-                        (config.mergeDuplicateContacts || it.id == contactToRemove.id) &&
+                        (it.id == contactToRemove.id ||
+                            (config.mergeDuplicateContacts && canHaveDuplicates(contactToRemove))) &&
                             it.getHashToCompare() == contactToRemove.getHashToCompare()
                     }
                     withoutKeptSeparate(contactToRemove, sameName, keptSeparate, visibleSources)
