@@ -429,8 +429,8 @@ class EditContactActivity : ContactActivity() {
             }
 
             findItem(R.id.manage_visible_fields).setOnMenuItemClickListener {
-                ManageVisibleFieldsDialog(this@EditContactActivity) {
-                    initContact()
+                ManageVisibleFieldsDialog(this@EditContactActivity) { changed ->
+                    if (changed) applyVisibleFields()
                 }
                 true
             }
@@ -566,6 +566,15 @@ class EditContactActivity : ContactActivity() {
         val isRingtoneVisible = showFields and SHOW_RINGTONE_FIELD != 0
         binding.contactRingtone.beVisibleIf(isRingtoneVisible)
         binding.contactRingtoneImage.beVisibleIf(isRingtoneVisible)
+    }
+
+    /** Shows the fields the user chose, keeping what was typed: addresses are rebuilt from the screen, not the DB. */
+    private fun applyVisibleFields() {
+        val saved = contact ?: return
+        contact = fillContactValues()
+        setupAddresses()
+        contact = saved
+        setupFieldVisibility()
     }
 
     private fun setupEditContact() {
