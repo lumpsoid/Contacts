@@ -32,19 +32,24 @@ class DuplicateScanner(private val context: Context) {
         }
     }
 
-    /** Accounts this app can save into, the private phone storage included, with their access. Blocking. */
+    /**
+     * Accounts this app can save into, the private phone storage included, with their access. Blocking.
+     * An account whose name another account also carries is left out: commons resolves the account by name.
+     */
     fun writableSources(): List<Pair<ContactSource, AccountAccess>> {
         val readOnly = readOnlyAdapterTypes()
-        val sources = ContactsHelper(context).getDeviceContactSources() + context.getPrivateContactSource()
+        val deviceSources = ContactsHelper(context).getDeviceContactSources().toList()
+        val usable = deviceSources.filter { accountTypeOf(it.name, deviceSources) != null }
+        val sources = usable + context.getPrivateContactSource()
         return sources.map { it to AccountAccess.of(it.type, readOnly) }.filter { it.second.isWritable() }
     }
 
     private fun toRecords(contacts: List<Contact>): List<MergeRecord> {
-        val types = ContactsHelper(context).getDeviceContactSources().associate { it.name to it.type }
+        val sources = ContactsHelper(context).getDeviceContactSources().toList()
         val readOnly = readOnlyAdapterTypes()
         return contacts.map { contact ->
-            val type = if (contact.isPrivate()) SMT_PRIVATE else types[contact.source] ?: ""
-            MergeRecord(contact, type, AccountAccess.of(type, readOnly))
+            val type = if (contact.isPrivate()) SMT_PRIVATE else accountTypeOf(contact.source, sources)
+            MergeRecord(contact, type ?: "", AccountAccess.of(type, readOnly))
         }
     }
 
@@ -53,3 +58,7 @@ class DuplicateScanner(private val context: Context) {
         .map { it.accountType }
         .toSet()
 }
+
+/** The type of the account named [name] among [sources]; null when none or several types carry that name. */
+fun accountTypeOf(name: String, sources: List<ContactSource>): String? =
+    sources.filter { it.name == name }.map { it.type }.distinct().singleOrNull()

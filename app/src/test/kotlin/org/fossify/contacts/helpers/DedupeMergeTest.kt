@@ -88,6 +88,40 @@ class DedupeMergeTest {
     }
 
     @Test
+    fun aLaterPrimaryCopyMakesTheNumberPrimary() {
+        val first = record(1, "Ann", numbers = listOf("111"))
+        val second = MergeRecord(
+            Contact(
+                id = 2,
+                contactId = 2,
+                firstName = "Ann",
+                source = "acc",
+                phoneNumbers = arrayListOf(PhoneNumber("111", 0, "", "111", isPrimary = true))
+            ),
+            "com.google",
+            AccountAccess.WRITABLE
+        )
+        val merged = buildMergedContact(first.contact, listOf(first, second), MergeChoices())
+        assertEquals(listOf("111"), merged.phoneNumbers.map { it.value })
+        assertEquals(listOf(true), merged.phoneNumbers.map { it.isPrimary })
+
+        // Positive control: with two different primary numbers, only the first one stays primary.
+        val other = MergeRecord(
+            Contact(
+                id = 3,
+                contactId = 3,
+                firstName = "Ann",
+                source = "acc",
+                phoneNumbers = arrayListOf(PhoneNumber("222", 0, "", "222", isPrimary = true))
+            ),
+            "com.google",
+            AccountAccess.WRITABLE
+        )
+        val twoPrimaries = buildMergedContact(first.contact, listOf(second, other), MergeChoices())
+        assertEquals(listOf(true, false), twoPrimaries.phoneNumbers.map { it.isPrimary })
+    }
+
+    @Test
     fun keepBothNotesJoinsEveryText() {
         val first = record(1, "Ann", notes = "a")
         val second = record(2, "Ann", notes = "b")
@@ -112,5 +146,13 @@ class DedupeMergeTest {
         val choices = MergeChoices().pick(ConflictField.BIRTHDAY, second.key)
         val merged = buildMergedContact(first.contact, listOf(first, second), choices)
         assertEquals(listOf(Event("1991-02-02", TYPE_BIRTHDAY)), merged.events)
+    }
+
+    @Test
+    fun onlyABitmapPhotoBoundForADeviceAccountNeedsAFile() {
+        assertTrue(needsPhotoFile("", hasBitmap = true, toPrivate = false))
+        assertFalse(needsPhotoFile("content://photo", hasBitmap = true, toPrivate = false))
+        assertFalse(needsPhotoFile("", hasBitmap = true, toPrivate = true))
+        assertFalse(needsPhotoFile("", hasBitmap = false, toPrivate = false))
     }
 }

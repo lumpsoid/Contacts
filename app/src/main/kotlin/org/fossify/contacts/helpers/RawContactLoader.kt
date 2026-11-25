@@ -81,6 +81,26 @@ class RawContactLoader(private val context: Context) {
         }
     }
 
+    /** Copies the stored name parts of raw contact [contact].id into [contact]; getContact leaves them blank. */
+    fun fillName(contact: Contact) {
+        val projection = arrayOf(
+            CommonDataKinds.StructuredName.PREFIX,
+            CommonDataKinds.StructuredName.GIVEN_NAME,
+            CommonDataKinds.StructuredName.MIDDLE_NAME,
+            CommonDataKinds.StructuredName.FAMILY_NAME,
+            CommonDataKinds.StructuredName.SUFFIX
+        )
+        val selection = "${Data.RAW_CONTACT_ID} = ? AND ${Data.MIMETYPE} = ?"
+        val selectionArgs = arrayOf(contact.id.toString(), CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+        context.queryCursor(Data.CONTENT_URI, projection, selection, selectionArgs, showErrors = true) { cursor ->
+            contact.prefix = cursor.getStringValue(CommonDataKinds.StructuredName.PREFIX) ?: ""
+            contact.firstName = cursor.getStringValue(CommonDataKinds.StructuredName.GIVEN_NAME) ?: ""
+            contact.middleName = cursor.getStringValue(CommonDataKinds.StructuredName.MIDDLE_NAME) ?: ""
+            contact.surname = cursor.getStringValue(CommonDataKinds.StructuredName.FAMILY_NAME) ?: ""
+            contact.suffix = cursor.getStringValue(CommonDataKinds.StructuredName.SUFFIX) ?: ""
+        }
+    }
+
     private fun hasNameRow(rawId: Int): Boolean {
         var found = false
         val selection = "${Data.RAW_CONTACT_ID} = ? AND ${Data.MIMETYPE} = ?"

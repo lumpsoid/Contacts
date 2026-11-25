@@ -1,15 +1,16 @@
 package org.fossify.contacts.models
 
-import android.net.Uri
-
 /** The end of a run: the backup failed and nothing was merged, or the plans ran (maybe cut short by cancel). */
 sealed class MergeRunResult {
     data object BackupFailed : MergeRunResult()
 
-    /** [total] plans were asked for; [outcomes] holds one entry per plan that ran, in order. */
+    /**
+     * [total] plans were asked for; [outcomes] holds one entry per plan that ran, in order.
+     * [backedUp]: the run wrote a backup before merging.
+     */
     data class Finished(
         val outcomes: List<MergeOutcome>,
-        val backupUri: Uri?,
+        val backedUp: Boolean,
         val total: Int
     ) : MergeRunResult() {
         val cancelled: Boolean get() = outcomes.size < total

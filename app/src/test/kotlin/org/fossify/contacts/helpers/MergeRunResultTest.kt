@@ -17,7 +17,7 @@ class MergeRunResultTest {
 
     @Test
     fun countsMergedAndFailedOutcomes() {
-        val result = MergeRunResult.Finished(outcomes, null, total = 3)
+        val result = MergeRunResult.Finished(outcomes, backedUp = false, total = 3)
 
         assertEquals(2, result.mergedCount())
         assertEquals(listOf("b"), result.failures().map { it.key })
@@ -25,7 +25,7 @@ class MergeRunResultTest {
 
     @Test
     fun aRunThatRanEveryPlanIsNotCancelled() {
-        val result = MergeRunResult.Finished(outcomes, null, total = 3)
+        val result = MergeRunResult.Finished(outcomes, backedUp = false, total = 3)
 
         assertFalse(result.cancelled)
         assertEquals(0, result.skippedCount())
@@ -33,7 +33,7 @@ class MergeRunResultTest {
 
     @Test
     fun plansThatNeverRanMakeTheRunCancelled() {
-        val result = MergeRunResult.Finished(outcomes, null, total = 5)
+        val result = MergeRunResult.Finished(outcomes, backedUp = false, total = 5)
 
         assertTrue(result.cancelled)
         assertEquals(2, result.skippedCount())

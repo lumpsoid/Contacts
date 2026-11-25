@@ -89,17 +89,26 @@ fun buildMergedContact(base: Contact, records: List<MergeRecord>, choices: Merge
     )
 }
 
-/** Numbers of [contacts] in order, each normalized number once; only the first primary number stays primary. */
+/** Numbers of [contacts] in order, each normalized number once; the first primary copy of any number stays primary. */
 private fun mergedPhoneNumbers(contacts: List<Contact>): ArrayList<PhoneNumber> {
-    val seen = HashSet<String>()
+    val keys = ArrayList<String>()
     val numbers = ArrayList<PhoneNumber>()
     var primaryKept = false
     contacts.flatMap { it.phoneNumbers }.forEach { number ->
-        if (seen.add(number.normalizedNumber.ifEmpty { number.value })) {
-            val primary = number.isPrimary && !primaryKept
-            primaryKept = primaryKept || primary
+        val key = number.normalizedNumber.ifEmpty { number.value }
+        val index = keys.indexOf(key)
+        val primary = number.isPrimary && !primaryKept
+        primaryKept = primaryKept || primary
+        if (index < 0) {
+            keys.add(key)
             numbers.add(number.copy(isPrimary = primary))
+        } else if (primary) {
+            numbers[index] = numbers[index].copy(isPrimary = true)
         }
     }
     return numbers
 }
+
+/** Whether a merged photo held only as a bitmap must be saved to a file first: device accounts read only the uri. */
+fun needsPhotoFile(photoUri: String, hasBitmap: Boolean, toPrivate: Boolean) =
+    hasBitmap && photoUri.isEmpty() && !toPrivate

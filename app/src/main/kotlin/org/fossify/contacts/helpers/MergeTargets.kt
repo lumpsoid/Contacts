@@ -45,13 +45,42 @@ fun summarize(plans: List<MergePlan>, destination: ContactSource) = MergeSummary
         .eachCount()
 )
 
-/** Whether [actual] holds every number (digits and "+") and every email of [expected]. */
+private val TEXT_FIELDS: List<(Contact) -> String> = listOf(
+    { it.prefix }, { it.firstName }, { it.middleName }, { it.surname }, { it.suffix },
+    { it.nickname }, { it.notes }, { it.organization.company }, { it.organization.jobPosition }
+)
+
+private val LIST_FIELDS: List<(Contact) -> List<String>> = listOf(
+    { contact -> contact.phoneNumbers.map { n -> n.value.filter { it.isDigit() || it == '+' } } },
+    { contact -> contact.emails.map { it.value } },
+    { contact -> contact.addresses.map { it.value } },
+    { contact -> contact.IMs.map { it.value } },
+    { contact -> contact.events.map { "${it.type}:${it.value}" } },
+    { contact -> contact.websites },
+    { contact -> contact.groups.map { it.title } }
+)
+
+private fun String.comparable() = trim().lowercase()
+
+/**
+ * Whether [actual] holds everything the merge wrote in [expected]: each non-blank name part, nickname, notes and
+ * organization field, every number (digits and "+"), email, address, IM, event, website and group title, and a photo
+ * when [expected] has one. Compared trimmed and ignoring case; photo contents are not compared.
+ * Sources are deleted only when this holds.
+ */
 fun verifyMerged(expected: Contact, actual: Contact): Boolean {
-    fun numbers(contact: Contact) =
-        contact.phoneNumbers.map { n -> n.value.filter { it.isDigit() || it == '+' } }.toSet()
-    fun emails(contact: Contact) = contact.emails.map { it.value.trim().lowercase() }.toSet()
-    return numbers(actual).containsAll(numbers(expected)) && emails(actual).containsAll(emails(expected))
+    val textsHeld = TEXT_FIELDS.all { field ->
+        field(expected).isBlank() || field(expected).comparable() == field(actual).comparable()
+    }
+    val listsHeld = LIST_FIELDS.all { field ->
+        val held = field(actual).map { it.comparable() }.toSet()
+        field(expected).map { it.comparable() }.filter { it.isNotEmpty() }.all { it in held }
+    }
+    val photoHeld = !hasPhoto(expected) || hasPhoto(actual)
+    return textsHeld && listsHeld && photoHeld
 }
+
+private fun hasPhoto(contact: Contact) = contact.photoUri.isNotEmpty() || contact.photo != null
 
 /** The commons photo status of an update: a photo is never removed, an equal or empty new uri is unchanged. */
 fun photoUpdateStatus(oldUri: String, newUri: String) = when {
