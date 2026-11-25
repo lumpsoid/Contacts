@@ -132,6 +132,7 @@ import org.fossify.contacts.helpers.IS_FROM_SIMPLE_CONTACTS
 import org.fossify.contacts.helpers.KEY_EMAIL
 import org.fossify.contacts.helpers.KEY_NAME
 import org.fossify.contacts.helpers.RawContactLoader
+import org.fossify.contacts.helpers.streetForStructuredEdit
 import java.util.LinkedList
 import java.util.Locale
 
@@ -738,7 +739,7 @@ class EditContactActivity : ContactActivity() {
                 }
 
                 structuredAddressHolder.apply {
-                    contactStreet.setText(address.street)
+                    contactStreet.setText(address.streetForStructuredEdit())
                     contactNeighborhood.setText(address.neighborhood)
                     contactCity.setText(address.city)
                     contactPostcode.setText(address.postcode)
