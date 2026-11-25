@@ -103,6 +103,8 @@ fun BaseSimpleActivity.shareContacts(contacts: ArrayList<Contact>) {
         if (result == VcfExporter.ExportResult.EXPORT_OK) {
             sharePathIntent(file.absolutePath, BuildConfig.APPLICATION_ID)
         } else {
+            // the stream is closed by the use block above, so a partial export can be removed
+            runCatching { file.delete() }
             showErrorToast("$result")
         }
     }
