@@ -24,6 +24,30 @@ internal fun isPreferred(values: List<String>, pref: Int?): Boolean {
     }
 }
 
+/** The Android phone types with no vCard TYPE name, each with the X- name it is written with and read back by. */
+private val extraPhoneTypes = mapOf(
+    Phone.TYPE_CAR to X_CAR,
+    Phone.TYPE_ISDN to X_ISDN,
+    Phone.TYPE_ASSISTANT to X_ASSISTANT,
+    Phone.TYPE_CALLBACK to X_CALLBACK,
+    Phone.TYPE_COMPANY_MAIN to X_COMPANY_MAIN,
+    Phone.TYPE_RADIO to X_RADIO,
+    Phone.TYPE_TELEX to X_TELEX,
+    Phone.TYPE_TTY_TDD to X_TTY_TDD,
+    Phone.TYPE_MMS to X_MMS,
+    Phone.TYPE_OTHER_FAX to X_OTHER_FAX,
+    Phone.TYPE_WORK_MOBILE to X_WORK_MOBILE,
+    Phone.TYPE_WORK_PAGER to X_WORK_PAGER,
+)
+/** The reverse of [extraPhoneTypes], plus the bare CAR and ISDN names, which are read but never written. */
+private val extraPhoneTypeIdsByName =
+    extraPhoneTypes.entries.associate { (typeId, name) -> name to typeId } +
+        mapOf(CAR to Phone.TYPE_CAR, ISDN to Phone.TYPE_ISDN)
+
+/** The phone type for a TYPE name that has no branch of its own in [phoneTypeId], or a custom type if unknown. */
+private fun extraPhoneTypeId(name: String): Int =
+    extraPhoneTypeIdsByName[name.uppercase(Locale.ROOT)] ?: Phone.TYPE_CUSTOM
+
 internal fun phoneTypeId(type: String, subtype: String?): Int =
     when (type.uppercase(Locale.ROOT)) {
         CELL -> Phone.TYPE_MOBILE
@@ -49,7 +73,7 @@ internal fun phoneTypeId(type: String, subtype: String?): Int =
         FAX -> if (subtype?.uppercase(Locale.ROOT) == HOME) Phone.TYPE_FAX_HOME else Phone.TYPE_FAX_WORK
         PAGER -> Phone.TYPE_PAGER
         OTHER -> Phone.TYPE_OTHER
-        else -> Phone.TYPE_CUSTOM
+        else -> extraPhoneTypeId(type)
     }
 
 internal fun emailTypeId(type: String): Int = when (type.uppercase(Locale.ROOT)) {
@@ -77,6 +101,7 @@ internal fun phoneTypeNames(type: Int, label: String): List<String> = when (type
     Phone.TYPE_FAX_HOME -> listOf(HOME, FAX)
     Phone.TYPE_PAGER -> listOf(PAGER)
     Phone.TYPE_OTHER -> listOf(OTHER)
+    in extraPhoneTypes -> listOf(extraPhoneTypes.getValue(type))
     else -> listOfNotNull(label.takeIf { it.isNotBlank() })
 }
 

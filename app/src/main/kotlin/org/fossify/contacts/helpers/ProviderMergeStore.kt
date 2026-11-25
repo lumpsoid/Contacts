@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.provider.ContactsContract.RawContacts
+import org.fossify.commons.databases.ContactsDatabase
 import org.fossify.commons.extensions.getCachePhoto
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.helpers.ContactsHelper
@@ -59,7 +60,7 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
     }
 
     override fun insert(merged: Contact, destination: ContactSource): List<Int>? {
-        val before = recordIdsAfter(0, destination).lastOrNull() ?: 0
+        val before = context.newestRecordId(destination)
         if (!ContactsHelper(context).insertContact(merged)) {
             // Commons can fail after its batch already created the raw contact; remove it when it is the only new one.
             val created = recordIdsAfter(before, destination)
@@ -124,7 +125,14 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
     /** Raw ids above [after] in [destination], ascending. */
     private fun recordIdsAfter(after: Int, destination: ContactSource): List<Int> {
         if (destination.type == SMT_PRIVATE) {
-            return LocalContactsHelper(context).getAllContacts().map { it.id }.filter { it > after }.sorted()
+            val db = ContactsDatabase.getInstance(context.applicationContext).openHelper.readableDatabase
+            val ids = ArrayList<Int>()
+            db.query("SELECT id FROM contacts WHERE id > ? ORDER BY id", arrayOf(after)).use {
+                while (it.moveToNext()) {
+                    ids.add(it.getInt(ID_COLUMN))
+                }
+            }
+            return ids
         }
         var ids: List<Int> = emptyList()
         val projection = arrayOf(RawContacts._ID, RawContacts.ACCOUNT_NAME, RawContacts.ACCOUNT_TYPE)
@@ -142,6 +150,29 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
             context.showErrorToast(e)
         }
         return ids
+    }
+}
+
+/** Highest raw id in [destination]'s store; every record inserted later is above it. */
+private fun Context.newestRecordId(destination: ContactSource): Int {
+    if (destination.type == SMT_PRIVATE) {
+        val db = ContactsDatabase.getInstance(applicationContext).openHelper.readableDatabase
+        return db.query("SELECT MAX(id) FROM contacts").use {
+            if (it.moveToFirst()) it.getInt(ID_COLUMN) else 0
+        }
+    }
+    val projection = arrayOf(RawContacts._ID)
+    val sortOrder = "${RawContacts._ID} DESC"
+    return try {
+        contentResolver.query(RawContacts.CONTENT_URI, projection, null, null, sortOrder)?.use {
+            if (it.moveToFirst()) it.getInt(ID_COLUMN) else 0
+        } ?: 0
+    } catch (e: SecurityException) {
+        showErrorToast(e)
+        0
+    } catch (e: IllegalArgumentException) {
+        showErrorToast(e)
+        0
     }
 }
 

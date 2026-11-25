@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.app.AlarmManagerCompat
 import androidx.core.content.FileProvider
 import org.fossify.commons.extensions.*
@@ -114,13 +115,18 @@ fun Context.backupContacts() {
 
             var exportFile = File(outputFolder, "$filename.vcf")
             var exportFilePath = exportFile.absolutePath
+            var exportFileUri: Uri? = null
             val outputStream = try {
                 if (hasProperStoredFirstParentUri(exportFilePath)) {
-                    val exportFileUri = createDocumentUriUsingFirstParentTreeUri(exportFilePath)
+                    val safUri = createDocumentUriUsingFirstParentTreeUri(exportFilePath)
                     if (!getDoesFilePathExist(exportFilePath)) {
                         createSAFFileSdk30(exportFilePath)
                     }
-                    applicationContext.contentResolver.openOutputStream(exportFileUri, "wt") ?: FileOutputStream(exportFile)
+                    val safStream = applicationContext.contentResolver.openOutputStream(safUri, "wt")
+                    if (safStream != null) {
+                        exportFileUri = safUri
+                    }
+                    safStream ?: FileOutputStream(exportFile)
                 } else {
                     var num = 0
                     while (getDoesFilePathExist(exportFilePath) && !exportFile.canWrite()) {
@@ -153,10 +159,22 @@ fun Context.backupContacts() {
 
             if (result == VcfExporter.ExportResult.EXPORT_FAIL) {
                 toast(org.fossify.commons.R.string.exporting_failed)
+                deleteFailedBackup(exportFileUri, exportFile)
             } else {
                 config.lastAutoBackupTime = DateTime.now().millis
             }
             scheduleNextAutomaticBackup()
+        }
+    }
+}
+
+// The stream is closed by now, so the file is not held open. A truncated backup must not stay in the folder.
+private fun Context.deleteFailedBackup(uri: Uri?, file: File) {
+    runCatching {
+        if (uri != null) {
+            DocumentsContract.deleteDocument(contentResolver, uri)
+        } else {
+            file.delete()
         }
     }
 }

@@ -35,7 +35,7 @@ jobs:
               with:
                   java-version: 17
                   distribution: "temurin"
-            - uses: FossifyOrg/.github/.github/actions/gradle-cache@main
+            - uses: FossifyOrg/.github/.github/actions/gradle-cache@a5aa5c5191edab24a7a011dfa20c945b06e475fe # main 2026-10-23
             - name: Run ${{ matrix.task }}
               run: ./gradlew ${{ matrix.task }}
             - name: Upload lint results
@@ -54,7 +54,7 @@ jobs:
               with:
                   java-version: 17
                   distribution: "temurin"
-            - uses: FossifyOrg/.github/.github/actions/gradle-cache@main
+            - uses: FossifyOrg/.github/.github/actions/gradle-cache@a5aa5c5191edab24a7a011dfa20c945b06e475fe # main 2026-10-23
             - name: Build debug APK
               run: ./gradlew assembleFossDebug
             - name: Upload debug APK
