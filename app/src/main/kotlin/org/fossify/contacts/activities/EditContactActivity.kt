@@ -391,6 +391,7 @@ class EditContactActivity : ContactActivity() {
     }
 
     override fun onBackPressedCompat(): Boolean {
+        if (isSaving) return true
         maybeShowUnsavedChangesDialog {
             performDefaultBack()
         }
@@ -449,6 +450,7 @@ class EditContactActivity : ContactActivity() {
         }
 
         binding.contactToolbar.setNavigationOnClickListener {
+            if (isSaving) return@setNavigationOnClickListener
             maybeShowUnsavedChangesDialog {
                 hideKeyboard()
                 finish()
