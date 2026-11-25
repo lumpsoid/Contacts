@@ -132,6 +132,7 @@ import org.fossify.contacts.helpers.IS_FROM_SIMPLE_CONTACTS
 import org.fossify.contacts.helpers.KEY_EMAIL
 import org.fossify.contacts.helpers.KEY_NAME
 import org.fossify.contacts.helpers.RawContactLoader
+import org.fossify.contacts.helpers.streetForStructuredEdit
 import java.util.LinkedList
 import java.util.Locale
 
@@ -140,6 +141,7 @@ class EditContactActivity : ContactActivity() {
         private const val INTENT_TAKE_PHOTO = 1
         private const val INTENT_CHOOSE_PHOTO = 2
         private const val INTENT_CROP_PHOTO = 3
+        private const val LAST_PHOTO_INTENT_URI = "last_photo_intent_uri"
 
         private const val TAKE_PHOTO = 1
         private const val CHOOSE_PHOTO = 2
@@ -166,6 +168,7 @@ class EditContactActivity : ContactActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.getString(LAST_PHOTO_INTENT_URI)?.let { lastPhotoIntentUri = Uri.parse(it) }
         setContentView(binding.root)
 
         if (checkAppSideloading()) {
@@ -208,9 +211,16 @@ class EditContactActivity : ContactActivity() {
         if (resultCode == RESULT_OK) {
             when (requestCode) {
                 INTENT_TAKE_PHOTO, INTENT_CHOOSE_PHOTO -> startCropPhotoIntent(lastPhotoIntentUri, resultData?.data)
-                INTENT_CROP_PHOTO -> updateContactPhoto(lastPhotoIntentUri.toString(), binding.contactPhoto, binding.contactPhotoBottomShadow)
+                INTENT_CROP_PHOTO -> lastPhotoIntentUri?.let {
+                    updateContactPhoto(it.toString(), binding.contactPhoto, binding.contactPhotoBottomShadow)
+                }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        lastPhotoIntentUri?.let { outState.putString(LAST_PHOTO_INTENT_URI, it.toString()) }
     }
 
     private fun initContact() {
@@ -221,7 +231,7 @@ class EditContactActivity : ContactActivity() {
             if (data != null && data.path != null) {
                 val rawId = if (data.path!!.contains("lookup")) {
                     if (data.pathSegments.last().startsWith("local_")) {
-                        data.path!!.substringAfter("local_").toInt()
+                        data.path!!.substringAfter("local_").toIntOrNull() ?: -1
                     } else {
                         getLookupUriRawId(data)
                     }
@@ -239,9 +249,11 @@ class EditContactActivity : ContactActivity() {
             ensureBackgroundThread {
                 contact = getContactWithIdOrRaw(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
                 if (contact == null) {
-                    toast(org.fossify.commons.R.string.unknown_error_occurred)
-                    hideKeyboard()
-                    finish()
+                    runOnUiThread {
+                        toast(org.fossify.commons.R.string.unknown_error_occurred)
+                        hideKeyboard()
+                        finish()
+                    }
                 } else {
                     runOnUiThread {
                         gotContact()
@@ -429,8 +441,8 @@ class EditContactActivity : ContactActivity() {
             }
 
             findItem(R.id.manage_visible_fields).setOnMenuItemClickListener {
-                ManageVisibleFieldsDialog(this@EditContactActivity) {
-                    initContact()
+                ManageVisibleFieldsDialog(this@EditContactActivity) { changed ->
+                    if (changed) applyVisibleFields()
                 }
                 true
             }
@@ -460,24 +472,42 @@ class EditContactActivity : ContactActivity() {
             return
         }
 
-        var imageUri = primaryUri
-        var bitmap = MediaStore.Images.Media.getBitmap(contentResolver, primaryUri)
-        if (bitmap == null) {
-            imageUri = backupUri
-            try {
-                bitmap = MediaStore.Images.Media.getBitmap(contentResolver, backupUri) ?: return
-            } catch (e: Exception) {
-                showErrorToast(e)
-                return
+        ensureBackgroundThread {
+            val imageUri = readableImageUri(primaryUri, backupUri)
+            runOnUiThread {
+                if (imageUri != null && !isFinishing && !isDestroyed) {
+                    launchCropIntent(imageUri)
+                }
             }
+        }
+    }
 
-            // we might have received an URI which we have no permission to send further, so just copy the received image in a new uri (for example from Google Photos)
-            val newFile = getCachePhoto()
-            val fos = newFile.outputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-            imageUri = getCachePhotoUri(newFile)
+    /**
+     * [primaryUri] if it decodes, else a cache copy of [backupUri]: we may lack permission to pass the backup on
+     * (for example an image from Google Photos). Null on failure.
+     */
+    private fun readableImageUri(primaryUri: Uri, backupUri: Uri?): Uri? {
+        if (runCatching { MediaStore.Images.Media.getBitmap(contentResolver, primaryUri) }.getOrNull() != null) {
+            return primaryUri
         }
 
+        return try {
+            copyToCachePhoto(MediaStore.Images.Media.getBitmap(contentResolver, backupUri))
+        } catch (e: Exception) {
+            showErrorToast(e)
+            null
+        }
+    }
+
+    /** A cache-file copy of [bitmap] that other apps may read; null when there is no bitmap. */
+    private fun copyToCachePhoto(bitmap: Bitmap?): Uri? {
+        bitmap ?: return null
+        val newFile = getCachePhoto()
+        newFile.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
+        return getCachePhotoUri(newFile)
+    }
+
+    private fun launchCropIntent(imageUri: Uri) {
         hideKeyboard()
         lastPhotoIntentUri = getCachePhotoUri()
         Intent("com.android.camera.action.CROP").apply {
@@ -566,6 +596,16 @@ class EditContactActivity : ContactActivity() {
         val isRingtoneVisible = showFields and SHOW_RINGTONE_FIELD != 0
         binding.contactRingtone.beVisibleIf(isRingtoneVisible)
         binding.contactRingtoneImage.beVisibleIf(isRingtoneVisible)
+    }
+
+    /** Shows the fields the user chose, keeping what was typed: addresses are rebuilt from the screen, not the DB. */
+    private fun applyVisibleFields() {
+        val saved = contact ?: return
+        contact = fillContactValues()
+        binding.contactAddressesHolder.removeAllViews()
+        setupAddresses()
+        contact = saved
+        setupFieldVisibility()
     }
 
     private fun setupEditContact() {
@@ -708,7 +748,7 @@ class EditContactActivity : ContactActivity() {
                 }
 
                 structuredAddressHolder.apply {
-                    contactStreet.setText(address.street)
+                    contactStreet.setText(address.streetForStructuredEdit())
                     contactNeighborhood.setText(address.neighborhood)
                     contactCity.setText(address.city)
                     contactPostcode.setText(address.postcode)
@@ -964,6 +1004,7 @@ class EditContactActivity : ContactActivity() {
     private fun setupPhoneNumberTypePicker(numberTypeField: TextView, type: Int, label: String) {
         numberTypeField.apply {
             text = getPhoneNumberTypeText(type, label)
+            tag = type
             setOnClickListener {
                 showNumberTypePicker(it as TextView)
             }
@@ -973,6 +1014,7 @@ class EditContactActivity : ContactActivity() {
     private fun setupEmailTypePicker(emailTypeField: TextView, type: Int, label: String) {
         emailTypeField.apply {
             text = getEmailTypeText(type, label)
+            tag = type
             setOnClickListener {
                 showEmailTypePicker(it as TextView)
             }
@@ -982,6 +1024,7 @@ class EditContactActivity : ContactActivity() {
     private fun setupAddressTypePicker(addressTypeField: TextView, type: Int, label: String) {
         addressTypeField.apply {
             text = getAddressTypeText(type, label)
+            tag = type
             setOnClickListener {
                 showAddressTypePicker(it as TextView)
             }
@@ -991,6 +1034,7 @@ class EditContactActivity : ContactActivity() {
     private fun setupIMTypePicker(imTypeField: TextView, type: Int, label: String) {
         imTypeField.apply {
             text = getIMTypeText(type, label)
+            tag = type
             setOnClickListener {
                 showIMTypePicker(it as TextView)
             }
@@ -1000,6 +1044,7 @@ class EditContactActivity : ContactActivity() {
     private fun setupEventTypePicker(eventHolder: ItemEventBinding, type: Int = DEFAULT_EVENT_TYPE) {
         eventHolder.contactEventType.apply {
             setText(getEventTextId(type))
+            tag = type
             setOnClickListener {
                 showEventTypePicker(it as TextView)
             }
@@ -1062,14 +1107,16 @@ class EditContactActivity : ContactActivity() {
             RadioItem(Phone.TYPE_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentNumberTypeId = getPhoneNumberTypeId(numberTypeField.value)
+        val currentNumberTypeId = typeOf(numberTypeField, ::getPhoneNumberTypeId)
         RadioGroupDialog(this, items, currentNumberTypeId) {
             if (it as Int == Phone.TYPE_CUSTOM) {
                 CustomLabelDialog(this) {
                     numberTypeField.text = it
+                    numberTypeField.tag = Phone.TYPE_CUSTOM
                 }
             } else {
                 numberTypeField.text = getPhoneNumberTypeText(it, "")
+                numberTypeField.tag = it
             }
         }
     }
@@ -1083,14 +1130,16 @@ class EditContactActivity : ContactActivity() {
             RadioItem(CommonDataKinds.Email.TYPE_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentEmailTypeId = getEmailTypeId(emailTypeField.value)
+        val currentEmailTypeId = typeOf(emailTypeField, ::getEmailTypeId)
         RadioGroupDialog(this, items, currentEmailTypeId) {
             if (it as Int == CommonDataKinds.Email.TYPE_CUSTOM) {
                 CustomLabelDialog(this) {
                     emailTypeField.text = it
+                    emailTypeField.tag = CommonDataKinds.Email.TYPE_CUSTOM
                 }
             } else {
                 emailTypeField.text = getEmailTypeText(it, "")
+                emailTypeField.tag = it
             }
         }
     }
@@ -1103,14 +1152,16 @@ class EditContactActivity : ContactActivity() {
             RadioItem(StructuredPostal.TYPE_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentAddressTypeId = getAddressTypeId(addressTypeField.value)
+        val currentAddressTypeId = typeOf(addressTypeField, ::getAddressTypeId)
         RadioGroupDialog(this, items, currentAddressTypeId) {
             if (it as Int == StructuredPostal.TYPE_CUSTOM) {
                 CustomLabelDialog(this) {
                     addressTypeField.text = it
+                    addressTypeField.tag = StructuredPostal.TYPE_CUSTOM
                 }
             } else {
                 addressTypeField.text = getAddressTypeText(it, "")
+                addressTypeField.tag = it
             }
         }
     }
@@ -1128,14 +1179,16 @@ class EditContactActivity : ContactActivity() {
             RadioItem(Im.PROTOCOL_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentIMTypeId = getIMTypeId(imTypeField.value)
+        val currentIMTypeId = typeOf(imTypeField, ::getIMTypeId)
         RadioGroupDialog(this, items, currentIMTypeId) {
             if (it as Int == Im.PROTOCOL_CUSTOM) {
                 CustomLabelDialog(this) {
                     imTypeField.text = it
+                    imTypeField.tag = Im.PROTOCOL_CUSTOM
                 }
             } else {
                 imTypeField.text = getIMTypeText(it, "")
+                imTypeField.tag = it
             }
         }
     }
@@ -1147,9 +1200,10 @@ class EditContactActivity : ContactActivity() {
             RadioItem(CommonDataKinds.Event.TYPE_OTHER, getString(org.fossify.commons.R.string.other))
         )
 
-        val currentEventTypeId = getEventTypeId(eventTypeField.value)
+        val currentEventTypeId = typeOf(eventTypeField, ::getEventTypeId)
         RadioGroupDialog(this, items, currentEventTypeId) {
             eventTypeField.setText(getEventTextId(it as Int))
+            eventTypeField.tag = it
         }
     }
 
@@ -1200,16 +1254,18 @@ class EditContactActivity : ContactActivity() {
         val newPrimary = contactValues.phoneNumbers.find { it.isPrimary }
         val primaryState = Pair(oldPrimary, newPrimary)
 
+        val previous = contact
+        isSaving = true
         contact = contactValues
 
         ensureBackgroundThread {
             config.lastUsedContactSource = contact!!.source
             when {
-                contact!!.id == 0 -> insertNewContact(false)
-                originalContactSource != contact!!.source -> insertNewContact(true)
+                contact!!.id == 0 -> insertNewContact(false, previous)
+                originalContactSource != contact!!.source -> insertNewContact(true, previous)
                 else -> {
                     val photoUpdateStatus = getPhotoUpdateStatus(oldPhotoUri, contact!!.photoUri)
-                    updateContact(photoUpdateStatus, primaryState)
+                    updateContact(photoUpdateStatus, primaryState, previous)
                 }
             }
         }
@@ -1253,7 +1309,7 @@ class EditContactActivity : ContactActivity() {
         for (i in 0 until numbersCount) {
             val numberHolder = ItemEditPhoneNumberBinding.bind(binding.contactNumbersHolder.getChildAt(i))
             val number = numberHolder.contactNumber.value
-            val numberType = getPhoneNumberTypeId(numberHolder.contactNumberType.value)
+            val numberType = typeOf(numberHolder.contactNumberType, ::getPhoneNumberTypeId)
             val numberLabel = if (numberType == Phone.TYPE_CUSTOM) numberHolder.contactNumberType.value else ""
 
             if (number.isNotEmpty()) {
@@ -1279,7 +1335,7 @@ class EditContactActivity : ContactActivity() {
         for (i in 0 until emailsCount) {
             val emailHolder = ItemEditEmailBinding.bind(binding.contactEmailsHolder.getChildAt(i))
             val email = emailHolder.contactEmail.value
-            val emailType = getEmailTypeId(emailHolder.contactEmailType.value)
+            val emailType = typeOf(emailHolder.contactEmailType, ::getEmailTypeId)
             val emailLabel = if (emailType == CommonDataKinds.Email.TYPE_CUSTOM) emailHolder.contactEmailType.value else ""
 
             if (email.isNotEmpty()) {
@@ -1314,7 +1370,7 @@ class EditContactActivity : ContactActivity() {
                 if (region.isNotEmpty()) lines += region
                 if (country.isNotEmpty()) lines += country.uppercase(Locale.getDefault())
                 val address  = lines.joinToString("\n")
-                val addressType = getAddressTypeId(structuredAddressHolder.contactStructuredAddressType.value)
+                val addressType = typeOf(structuredAddressHolder.contactStructuredAddressType, ::getAddressTypeId)
                 val addressLabel = if (addressType == StructuredPostal.TYPE_CUSTOM)
                      structuredAddressHolder.contactStructuredAddressType.value else ""
 
@@ -1325,7 +1381,7 @@ class EditContactActivity : ContactActivity() {
             } else {
                 val addressHolder = ItemEditAddressBinding.bind(addressHolderView)
                 val address = addressHolder.contactAddress.value
-                val addressType = getAddressTypeId(addressHolder.contactAddressType.value)
+                val addressType = typeOf(addressHolder.contactAddressType, ::getAddressTypeId)
                 val addressLabel = if (addressType == StructuredPostal.TYPE_CUSTOM) addressHolder.contactAddressType.value else ""
 
                 if (address.isNotEmpty()) {
@@ -1342,11 +1398,11 @@ class EditContactActivity : ContactActivity() {
         for (i in 0 until IMsCount) {
             val IMsHolder = ItemEditImBinding.bind(binding.contactImsHolder.getChildAt(i))
             val IM = IMsHolder.contactIm.value
-            val IMType = getIMTypeId(IMsHolder.contactImType.value)
-            val IMLabel = if (IMType == Im.PROTOCOL_CUSTOM) IMsHolder.contactImType.value else ""
+            val imType = typeOf(IMsHolder.contactImType, ::getIMTypeId)
+            val imLabel = if (imType == Im.PROTOCOL_CUSTOM) IMsHolder.contactImType.value else ""
 
             if (IM.isNotEmpty()) {
-                IMs.add(IM(IM, IMType, IMLabel))
+                IMs.add(IM(IM, imType, imLabel))
             }
         }
         return IMs
@@ -1359,7 +1415,7 @@ class EditContactActivity : ContactActivity() {
         for (i in 0 until eventsCount) {
             val eventHolder = ItemEventBinding.bind(binding.contactEventsHolder.getChildAt(i))
             val event = eventHolder.contactEvent.value
-            val eventType = getEventTypeId(eventHolder.contactEventType.value)
+            val eventType = typeOf(eventHolder.contactEventType, ::getEventTypeId)
 
             if (event.isNotEmpty() && event != unknown) {
                 events.add(Event(eventHolder.contactEvent.tag.toString(), eventType))
@@ -1381,8 +1437,7 @@ class EditContactActivity : ContactActivity() {
         return websites
     }
 
-    private fun insertNewContact(deleteCurrentContact: Boolean) {
-        isSaving = true
+    private fun insertNewContact(deleteCurrentContact: Boolean, previous: Contact?) {
         if (!deleteCurrentContact) {
             toast(R.string.inserting)
         }
@@ -1391,39 +1446,47 @@ class EditContactActivity : ContactActivity() {
             if (deleteCurrentContact) {
                 contact!!.source = originalContactSource
                 ContactsHelper(this).deleteContact(contact!!, false) {
-                    setResult(Activity.RESULT_OK)
-                    hideKeyboard()
-                    finish()
+                    finishSaved()
                 }
             } else {
-                setResult(Activity.RESULT_OK)
-                hideKeyboard()
-                finish()
+                finishSaved()
             }
         } else {
-            toast(org.fossify.commons.R.string.unknown_error_occurred)
+            saveFailed(previous)
         }
     }
 
-    private fun updateContact(photoUpdateStatus: Int, primaryState: Pair<PhoneNumber?, PhoneNumber?>) {
-        isSaving = true
+    private fun updateContact(
+        photoUpdateStatus: Int,
+        primaryState: Pair<PhoneNumber?, PhoneNumber?>,
+        previous: Contact?
+    ) {
         RawContactLoader(this).ensureNameRow(contact!!)
         if (ContactsHelper(this@EditContactActivity).updateContact(contact!!, photoUpdateStatus)) {
             val status = getPrimaryNumberStatus(primaryState.first, primaryState.second)
             if (status != PrimaryNumberStatus.UNCHANGED) {
                 updateDefaultNumberForDuplicateContacts(primaryState, status) {
-                    setResult(Activity.RESULT_OK)
-                    hideKeyboard()
-                    finish()
+                    finishSaved()
                 }
             } else {
-                setResult(Activity.RESULT_OK)
-                hideKeyboard()
-                finish()
+                finishSaved()
             }
         } else {
-            toast(org.fossify.commons.R.string.unknown_error_occurred)
+            saveFailed(previous)
         }
+    }
+
+    private fun finishSaved() = runOnUiThread {
+        setResult(Activity.RESULT_OK)
+        hideKeyboard()
+        finish()
+    }
+
+    /** Puts back the contact from before the save, so the edits still count as unsaved, and allows another try. */
+    private fun saveFailed(previous: Contact?) = runOnUiThread {
+        contact = previous
+        isSaving = false
+        toast(org.fossify.commons.R.string.unknown_error_occurred)
     }
 
     private fun updateDefaultNumberForDuplicateContacts(
@@ -1704,6 +1767,10 @@ class EditContactActivity : ContactActivity() {
         val contactRingtone = RingtoneManager.getRingtone(this, uri)
         binding.contactRingtone.text = contactRingtone.getTitle(this)
     }
+
+    /** The type id the row's type field holds; [byText] maps its text for a field no picker has set up. */
+    private fun typeOf(typeField: TextView, byText: (String) -> Int): Int =
+        typeField.tag as? Int ?: byText(typeField.value)
 
     private fun getPhoneNumberTypeId(value: String) = when (value) {
         getString(org.fossify.commons.R.string.mobile) -> Phone.TYPE_MOBILE
