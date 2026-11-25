@@ -68,7 +68,8 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         if (destination.type == SMT_PRIVATE) {
             return LocalContactsHelper(context).getContactWithId(id)
         }
-        return RawContactLoader(context).getContact(id)
+        val loader = RawContactLoader(context)
+        return loader.getContact(id)?.also { loader.fillName(it) }
     }
 
     override fun delete(contacts: List<Contact>): Boolean {

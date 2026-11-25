@@ -5,9 +5,14 @@ import org.fossify.commons.helpers.PHOTO_CHANGED
 import org.fossify.commons.helpers.PHOTO_UNCHANGED
 import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.PhoneNumber
+import org.fossify.commons.models.contacts.Address
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Email
+import org.fossify.commons.models.contacts.Event
+import org.fossify.commons.models.contacts.Group
+import org.fossify.commons.models.contacts.IM
+import org.fossify.commons.models.contacts.Organization
 import org.fossify.contacts.models.AccountAccess
 import org.fossify.contacts.models.MergeChoices
 import org.fossify.contacts.models.MergeKind
@@ -158,6 +163,54 @@ class MergeTargetsTest {
 
         val other = record(3, "Google", emails = listOf("bob@x.com")).contact
         assertFalse(verifyMerged(expected, other))
+    }
+
+    @Test
+    fun verifyFailsOnAMissingAddressNoteOrGroup() {
+        val withAddress = Contact(id = 1, contactId = 1, addresses = arrayListOf(Address("1 Main St", 0, "")))
+        assertFalse(verifyMerged(withAddress, Contact(id = 2, contactId = 2)))
+
+        val withNote = Contact(id = 1, contactId = 1, notes = "met at work")
+        assertFalse(verifyMerged(withNote, Contact(id = 2, contactId = 2, notes = "")))
+
+        val withGroup = Contact(id = 1, contactId = 1, groups = arrayListOf(Group(1L, "Family")))
+        assertFalse(verifyMerged(withGroup, Contact(id = 2, contactId = 2)))
+    }
+
+    @Test
+    fun verifyFailsOnADifferentName() {
+        val expected = Contact(id = 1, contactId = 1, firstName = "Anna")
+        assertFalse(verifyMerged(expected, Contact(id = 2, contactId = 2, firstName = "Hanna")))
+        assertTrue(verifyMerged(expected, Contact(id = 2, contactId = 2, firstName = " anna ")))
+    }
+
+    @Test
+    fun verifyIgnoresBlankExpectedFields() {
+        val expected = Contact(id = 1, contactId = 1)
+        val actual = Contact(id = 2, contactId = 2, firstName = "Anna", notes = "x")
+        assertTrue(verifyMerged(expected, actual))
+    }
+
+    @Test
+    fun verifyPassesWhenEveryFieldLanded() {
+        val expected = Contact(
+            id = 1,
+            contactId = 1,
+            firstName = "Anna",
+            surname = "Petrova",
+            nickname = "Ann",
+            organization = Organization("Acme", "CTO"),
+            addresses = arrayListOf(Address("1 Main St", 0, "")),
+            IMs = arrayListOf(IM("ann@jabber", 0, "")),
+            events = arrayListOf(Event("--05-01", 3)),
+            websites = arrayListOf("https://a.example"),
+            groups = arrayListOf(Group(5L, "Family"))
+        )
+        val actual = expected.copy(
+            id = 2,
+            groups = arrayListOf(Group(9L, "family"), Group(10L, "Work"))
+        )
+        assertTrue(verifyMerged(expected, actual))
     }
 
     @Test
