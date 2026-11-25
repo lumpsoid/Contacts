@@ -11,6 +11,7 @@ import org.fossify.commons.models.contacts.Contact
 import org.fossify.contacts.helpers.ContactLinkHelper
 import org.fossify.contacts.helpers.RawContactLoader
 import org.fossify.contacts.helpers.addNamelessContacts
+import org.fossify.contacts.helpers.canHaveDuplicates
 import org.fossify.contacts.helpers.mergeDuplicatesByName
 import org.fossify.contacts.helpers.namelessDuplicatesOf
 import org.fossify.contacts.helpers.namelessRules
@@ -70,6 +71,10 @@ fun Context.getContactsWithNameless(
 
 /** Commons getDuplicatesOfContact, plus the nameless raw contacts it cannot load. */
 fun Context.getDuplicatesOfContactWithNameless(contact: Contact, callback: (ArrayList<Contact>) -> Unit) {
+    if (!canHaveDuplicates(contact)) {
+        Handler(Looper.getMainLooper()).post { callback(ArrayList()) }
+        return
+    }
     ContactsHelper(this).getDuplicatesOfContact(contact, false) { duplicates ->
         ensureBackgroundThread {
             val nameless = RawContactLoader(this).getNamelessContacts(HashSet())

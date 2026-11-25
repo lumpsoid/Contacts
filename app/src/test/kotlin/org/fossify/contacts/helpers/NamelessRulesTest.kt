@@ -3,6 +3,8 @@ package org.fossify.contacts.helpers
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.contacts.Contact
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NamelessRulesTest {
@@ -20,6 +22,8 @@ class NamelessRulesTest {
         source = "acc",
         phoneNumbers = arrayListOf(PhoneNumber(number, 2, "", number))
     )
+
+    private fun notesOnly(id: Int) = Contact(id = id, contactId = id, source = "acc", notes = "note $id")
 
     private fun ids(contacts: List<Contact>) = contacts.map { it.id }
 
@@ -101,5 +105,20 @@ class NamelessRulesTest {
         val nameless = listOf(phoneOnly(ID_SELF, NUMBER_A))
         val result = namelessDuplicatesOf(contact, nameless)
         assertEquals(listOf(ID_SELF), ids(result))
+    }
+
+    @Test
+    fun blankContactHasNoNamelessDuplicates() {
+        // positive control: the two blank contacts hash equal, so only the blank-name guard keeps them apart
+        assertEquals(notesOnly(ID_SAME_NUMBER).getHashToCompare(), notesOnly(ID_OTHER_NUMBER).getHashToCompare())
+        val nameless = listOf(notesOnly(ID_SAME_NUMBER), notesOnly(ID_OTHER_NUMBER))
+        val result = namelessDuplicatesOf(notesOnly(ID_SELF), nameless)
+        assertEquals(emptyList<Int>(), ids(result))
+    }
+
+    @Test
+    fun blankContactCannotHaveDuplicates() {
+        assertFalse(canHaveDuplicates(notesOnly(ID_SELF)))
+        assertTrue(canHaveDuplicates(phoneOnly(ID_SELF, NUMBER_A)))
     }
 }
