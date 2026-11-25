@@ -486,19 +486,25 @@ class EditContactActivity : ContactActivity() {
      * [primaryUri] if it decodes, else a cache copy of [backupUri]: we may lack permission to pass the backup on
      * (for example an image from Google Photos). Null on failure.
      */
-    private fun readableImageUri(primaryUri: Uri, backupUri: Uri?): Uri? = try {
-        if (MediaStore.Images.Media.getBitmap(contentResolver, primaryUri) != null) {
-            primaryUri
-        } else {
-            MediaStore.Images.Media.getBitmap(contentResolver, backupUri)?.let { bitmap ->
-                val newFile = getCachePhoto()
-                newFile.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
-                getCachePhotoUri(newFile)
-            }
+    private fun readableImageUri(primaryUri: Uri, backupUri: Uri?): Uri? {
+        if (runCatching { MediaStore.Images.Media.getBitmap(contentResolver, primaryUri) }.getOrNull() != null) {
+            return primaryUri
         }
-    } catch (e: Exception) {
-        showErrorToast(e)
-        null
+
+        return try {
+            copyToCachePhoto(MediaStore.Images.Media.getBitmap(contentResolver, backupUri))
+        } catch (e: Exception) {
+            showErrorToast(e)
+            null
+        }
+    }
+
+    /** A cache-file copy of [bitmap] that other apps may read; null when there is no bitmap. */
+    private fun copyToCachePhoto(bitmap: Bitmap?): Uri? {
+        bitmap ?: return null
+        val newFile = getCachePhoto()
+        newFile.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
+        return getCachePhotoUri(newFile)
     }
 
     private fun launchCropIntent(imageUri: Uri) {
@@ -596,6 +602,7 @@ class EditContactActivity : ContactActivity() {
     private fun applyVisibleFields() {
         val saved = contact ?: return
         contact = fillContactValues()
+        binding.contactAddressesHolder.removeAllViews()
         setupAddresses()
         contact = saved
         setupFieldVisibility()
@@ -1391,11 +1398,11 @@ class EditContactActivity : ContactActivity() {
         for (i in 0 until IMsCount) {
             val IMsHolder = ItemEditImBinding.bind(binding.contactImsHolder.getChildAt(i))
             val IM = IMsHolder.contactIm.value
-            val IMType = typeOf(IMsHolder.contactImType, ::getIMTypeId)
-            val IMLabel = if (IMType == Im.PROTOCOL_CUSTOM) IMsHolder.contactImType.value else ""
+            val imType = typeOf(IMsHolder.contactImType, ::getIMTypeId)
+            val imLabel = if (imType == Im.PROTOCOL_CUSTOM) IMsHolder.contactImType.value else ""
 
             if (IM.isNotEmpty()) {
-                IMs.add(IM(IM, IMType, IMLabel))
+                IMs.add(IM(IM, imType, imLabel))
             }
         }
         return IMs
