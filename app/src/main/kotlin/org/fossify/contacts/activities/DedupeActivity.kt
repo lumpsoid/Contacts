@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.result.contract.ActivityResultContracts
 import org.fossify.commons.dialogs.RadioGroupDialog
@@ -64,10 +65,14 @@ class DedupeActivity : SimpleActivity() {
         binding.dedupeClose.setOnClickListener { finish() }
         binding.dedupeMerge.setOnClickListener { pickDestination() }
         binding.dedupeCancel.setOnClickListener { MergeSession.cancel() }
-        binding.dedupeResult.dedupeDone.setOnClickListener { finish() }
+        binding.dedupeResult.dedupeDone.setOnClickListener {
+            MergeSession.clearDone()
+            finish()
+        }
         restoredState = savedInstanceState?.getStringArrayList(SELECTION_STATE)
+        val hadSession = MergeSession.state != null
         MergeSession.observe(this) { state -> runOnUiThread { if (!isDestroyed) showState(state) } }
-        if (MergeSession.state == null) startScan()
+        if (!hadSession) startScan()
     }
 
     override fun onResume() {
@@ -76,6 +81,7 @@ class DedupeActivity : SimpleActivity() {
     }
 
     override fun onDestroy() {
+        if (isFinishing && binding.dedupeResult.root.visibility == View.VISIBLE) MergeSession.clearDone()
         MergeSession.stopObserving(this)
         super.onDestroy()
     }
@@ -105,6 +111,7 @@ class DedupeActivity : SimpleActivity() {
     }
 
     private fun showReview(result: ScanResult) {
+        if (binding.dedupeResult.root.visibility == View.VISIBLE) return
         binding.dedupeProgressHolder.beGone()
         if (result.isEmpty()) {
             binding.dedupeEmptyHolder.beVisible()
@@ -191,10 +198,7 @@ class DedupeActivity : SimpleActivity() {
     private fun showState(state: MergeSession.State) {
         when (state) {
             is MergeSession.State.Running -> showRunning(state.done, state.total)
-            is MergeSession.State.Done -> {
-                showResult(state.result, state.labels)
-                MergeSession.clearDone()
-            }
+            is MergeSession.State.Done -> showResult(state.result, state.labels)
         }
     }
 
