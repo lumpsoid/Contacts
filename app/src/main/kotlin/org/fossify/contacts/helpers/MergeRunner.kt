@@ -1,7 +1,6 @@
 package org.fossify.contacts.helpers
 
 import android.content.Context
-import android.database.SQLException
 import android.net.Uri
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.models.contacts.Contact
@@ -44,7 +43,11 @@ class MergeRunner(private val store: MergeStore, private val onError: (Exception
         return MergeRunResult.Finished(outcomes, backedUp = backUp != null, total = plans.size)
     }
 
-    /** Merges [plan]; an unexpected error fails only this plan, so the rest of the run goes on. */
+    /**
+     * Merges [plan]; an unexpected error fails only this plan, so the rest of the run goes on.
+     * Any exception fails only this plan: nothing of it is deleted before a verified write.
+     */
+    @Suppress("TooGenericExceptionCaught") // a background thread that dies leaves the run without a Done state
     private fun mergeSafely(
         writer: DedupeWriter,
         plan: MergePlan,
@@ -53,16 +56,7 @@ class MergeRunner(private val store: MergeStore, private val onError: (Exception
     ): MergeOutcome {
         return try {
             writer.merge(plan, destination, access)
-        } catch (e: SQLException) {
-            onError(e)
-            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
-        } catch (e: IllegalStateException) {
-            onError(e)
-            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
-        } catch (e: IllegalArgumentException) {
-            onError(e)
-            MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
-        } catch (e: SecurityException) {
+        } catch (e: Exception) {
             onError(e)
             MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
         }

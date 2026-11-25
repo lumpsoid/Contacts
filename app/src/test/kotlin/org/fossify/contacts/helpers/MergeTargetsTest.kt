@@ -182,6 +182,13 @@ class MergeTargetsTest {
     }
 
     @Test
+    fun verifyFailsOnAMissingPhoto() {
+        val expected = Contact(id = 1, contactId = 1, photoUri = "content://a")
+        assertFalse(verifyMerged(expected, Contact(id = 2, contactId = 2)))
+        assertTrue(verifyMerged(expected, Contact(id = 2, contactId = 2, photoUri = "content://b")))
+    }
+
+    @Test
     fun verifyFailsOnADifferentName() {
         val expected = Contact(id = 1, contactId = 1, firstName = "Anna")
         assertFalse(verifyMerged(expected, Contact(id = 2, contactId = 2, firstName = "Hanna")))

@@ -64,8 +64,9 @@ private fun String.comparable() = trim().lowercase()
 
 /**
  * Whether [actual] holds everything the merge wrote in [expected]: each non-blank name part, nickname, notes and
- * organization field, and every number (digits and "+"), email, address, IM, event, website and group title.
- * Compared trimmed and ignoring case. Sources are deleted only when this holds.
+ * organization field, every number (digits and "+"), email, address, IM, event, website and group title, and a photo
+ * when [expected] has one. Compared trimmed and ignoring case; photo contents are not compared.
+ * Sources are deleted only when this holds.
  */
 fun verifyMerged(expected: Contact, actual: Contact): Boolean {
     val textsHeld = TEXT_FIELDS.all { field ->
@@ -75,8 +76,11 @@ fun verifyMerged(expected: Contact, actual: Contact): Boolean {
         val held = field(actual).map { it.comparable() }.toSet()
         field(expected).map { it.comparable() }.filter { it.isNotEmpty() }.all { it in held }
     }
-    return textsHeld && listsHeld
+    val photoHeld = !hasPhoto(expected) || hasPhoto(actual)
+    return textsHeld && listsHeld && photoHeld
 }
+
+private fun hasPhoto(contact: Contact) = contact.photoUri.isNotEmpty() || contact.photo != null
 
 /** The commons photo status of an update: a photo is never removed, an equal or empty new uri is unchanged. */
 fun photoUpdateStatus(oldUri: String, newUri: String) = when {

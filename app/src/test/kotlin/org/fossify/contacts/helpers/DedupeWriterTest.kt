@@ -131,6 +131,8 @@ class DedupeWriterTest {
         )
         val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
         assertEquals(MergeOutcome.Merged(plan.key), outcome)
+        assertTrue(store.calls.contains("readBack:101"))
+        assertTrue(store.deletes().none { it.split(':', ',').contains("100") })
         assertEquals(listOf("delete:1,2"), store.deletes())
     }
 

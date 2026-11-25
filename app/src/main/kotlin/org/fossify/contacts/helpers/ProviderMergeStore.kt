@@ -34,8 +34,8 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
 
     override fun savePhoto(photo: Bitmap): String? = try {
         val file = context.getCachePhoto()
-        FileOutputStream(file).use { photo.compress(Bitmap.CompressFormat.JPEG, PHOTO_QUALITY, it) }
-        context.getCachePhotoUri(file).toString()
+        val saved = FileOutputStream(file).use { photo.compress(Bitmap.CompressFormat.JPEG, PHOTO_QUALITY, it) }
+        if (saved) context.getCachePhotoUri(file).toString() else null
     } catch (e: IOException) {
         context.showErrorToast(e)
         null
@@ -55,12 +55,19 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         RawContactLoader(context).ensureNameRow(merged)
         val photo = photoUpdateStatus(target.contact.photoUri, merged.photoUri)
         if (!ContactsHelper(context).updateContact(merged, photo)) return false
-        return linked.isEmpty() || memberships.restore(target.contact, linked)
+        return linked.isEmpty() || memberships.restore(linked)
     }
 
     override fun insert(merged: Contact, destination: ContactSource): List<Int>? {
         val before = recordIdsAfter(0, destination).lastOrNull() ?: 0
-        if (!ContactsHelper(context).insertContact(merged)) return null
+        if (!ContactsHelper(context).insertContact(merged)) {
+            // Commons can fail after its batch already created the raw contact; remove it when it is the only new one.
+            val created = recordIdsAfter(before, destination)
+            if (created.size == 1) {
+                ContactsHelper(context).deleteContacts(arrayListOf(merged.copy(id = created.first())))
+            }
+            return null
+        }
         return recordIdsAfter(before, destination)
     }
 
