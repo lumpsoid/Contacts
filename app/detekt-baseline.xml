@@ -4,7 +4,6 @@
   <CurrentIssues>
     <ID>ComplexCondition:ContactActivity.kt$ContactActivity$requestCode == PICK_RINGTONE_INTENT_ID &amp;&amp; resultCode == RESULT_OK &amp;&amp; resultData != null &amp;&amp; resultData.dataString != null</ID>
     <ID>ComplexCondition:EditContactActivity.kt$EditContactActivity$((contact!!.id == 0 &amp;&amp; action == Intent.ACTION_INSERT) || action == ADD_NEW_CONTACT_NUMBER) &amp;&amp; intent.extras != null</ID>
-    <ID>ComplexCondition:EditContactActivity.kt$EditContactActivity$currentContactPhotoPath.isEmpty() &amp;&amp; getFilledPhoneNumbers().isEmpty() &amp;&amp; getFilledEmails().isEmpty() &amp;&amp; getFilledAddresses().isEmpty() &amp;&amp; getFilledIMs().isEmpty() &amp;&amp; getFilledEvents().isEmpty() &amp;&amp; getFilledWebsites().isEmpty()</ID>
     <ID>ComplexCondition:MyViewPagerFragment.kt$MyViewPagerFragment$(config.showTabs and TAB_CONTACTS == 0 &amp;&amp; this is ContactsFragment &amp;&amp; activity !is InsertOrEditContactActivity) || (config.showTabs and TAB_FAVORITES == 0 &amp;&amp; this is FavoritesFragment) || (config.showTabs and TAB_GROUPS == 0 &amp;&amp; this is GroupsFragment)</ID>
     <ID>CyclomaticComplexMethod:ContactsAdapter.kt$ContactsAdapter$private fun setupView(view: View, contact: Contact, holder: ViewHolder)</ID>
     <ID>CyclomaticComplexMethod:EditContactActivity.kt$EditContactActivity$private fun gotContact()</ID>
@@ -37,7 +36,6 @@
     <ID>MagicNumber:MyDatePickerDialog.kt$MyDatePickerDialog$7</ID>
     <ID>MagicNumber:MyDatePickerDialog.kt$MyDatePickerDialog$8</ID>
     <ID>MagicNumber:VcfImporter.kt$VcfImporter$100</ID>
-    <ID>MagicNumber:VcfImporter.kt$VcfImporter$1900</ID>
     <ID>MaxLineLength:Activity.kt$fun</ID>
     <ID>MaxLineLength:AutoCompleteTextViewAdapter.kt$AutoCompleteTextViewAdapter$val placeholder = BitmapDrawable(activity.resources, SimpleContactsHelper(context).getContactLetterIcon(nameToUse))</ID>
     <ID>MaxLineLength:AutomaticBackupReceiver.kt$AutomaticBackupReceiver$val wakelock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "simplecontacts:automaticbackupreceiver")</ID>
@@ -75,8 +73,6 @@
     <ID>MaxLineLength:Context.kt$return PendingIntent.getBroadcast(this, AUTOMATIC_BACKUP_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)</ID>
     <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$// if the last used contact source is not available anymore, use the first available one. Could happen at ejecting SIM card</ID>
     <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$// normalized number +421903123456, then at getting it from the input field we get 0903123456, can happen at WhatsApp contacts</ID>
-    <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$// we might have received an URI which we have no permission to send further, so just copy the received image in a new uri (for example from Google Photos)</ID>
-    <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$INTENT_CROP_PHOTO -&gt; updateContactPhoto(lastPhotoIntentUri.toString(), binding.contactPhoto, binding.contactPhotoBottomShadow)</ID>
     <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$ItemEditStructuredAddressBinding.inflate(layoutInflater, binding.contactAddressesHolder, false)</ID>
     <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$SelectAlarmSoundDialog</ID>
     <ID>MaxLineLength:EditContactActivity.kt$EditContactActivity$binding.contactNumbersAddNew</ID>
@@ -173,7 +169,6 @@
     <ID>NestedBlockDepth:SelectContactsAdapter.kt$SelectContactsAdapter.ViewHolder$fun bindView(contact: Contact): View</ID>
     <ID>NestedBlockDepth:VcfExporter.kt$VcfExporter$fun exportContacts( context: Context, outputStream: OutputStream?, contacts: ArrayList&lt;Contact&gt;, showExportingToast: Boolean, version: VCardVersion = VCardVersion.V4_0, callback: (result: ExportResult) -&gt; Unit, )</ID>
     <ID>NestedBlockDepth:VcfImporter.kt$VcfImporter$fun importContacts(path: String, targetContactSource: String): ImportResult</ID>
-    <ID>NestedBlockDepth:VcfImporter.kt$VcfImporter$private fun getContactGroups(ezContact: VCard): ArrayList&lt;Group&gt;</ID>
     <ID>NestedBlockDepth:ViewContactActivity.kt$ViewContactActivity$private fun initContact()</ID>
     <ID>NestedBlockDepth:ViewContactActivity.kt$ViewContactActivity$private fun setupContactSources()</ID>
     <ID>NestedBlockDepth:ViewContactActivity.kt$ViewContactActivity$private fun setupPhoneNumbers()</ID>
@@ -221,14 +216,10 @@
     <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IM = IMsHolder.contactIm.value</ID>
     <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMHolder = ItemEditImBinding.bind(binding.contactImsHolder.getChildAt(0))</ID>
     <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMHolder = ItemEditImBinding.inflate(layoutInflater, binding.contactImsHolder, false)</ID>
-    <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMLabel = if (IMType == Im.PROTOCOL_CUSTOM) IMsHolder.contactImType.value else ""</ID>
-    <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMType = getIMTypeId(IMsHolder.contactImType.value)</ID>
     <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMs = ArrayList&lt;IM&gt;()</ID>
     <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMsCount = binding.contactImsHolder.childCount</ID>
     <ID>VariableNaming:EditContactActivity.kt$EditContactActivity$val IMsHolder = ItemEditImBinding.bind(binding.contactImsHolder.getChildAt(i))</ID>
     <ID>VariableNaming:GroupContactsActivity.kt$GroupContactsActivity$protected val INTENT_SELECT_RINGTONE = 600</ID>
-    <ID>VariableNaming:VcfImporter.kt$VcfImporter$val IM = IM(value, type, label)</ID>
-    <ID>VariableNaming:VcfImporter.kt$VcfImporter$val IMs = ArrayList&lt;IM&gt;()</ID>
     <ID>VariableNaming:ViewContactActivity.kt$ViewContactActivity$val IM = it</ID>
     <ID>VariableNaming:ViewContactActivity.kt$ViewContactActivity$var IMs = contact!!.IMs.toMutableSet() as LinkedHashSet&lt;IM&gt;</ID>
     <ID>WildcardImport:ChangeSortingDialog.kt$import org.fossify.commons.helpers.*</ID>
@@ -256,7 +247,6 @@
     <ID>WildcardImport:SettingsActivity.kt$import org.fossify.commons.extensions.*</ID>
     <ID>WildcardImport:SettingsActivity.kt$import org.fossify.commons.helpers.*</ID>
     <ID>WildcardImport:SettingsActivity.kt$import org.fossify.contacts.extensions.*</ID>
-    <ID>WildcardImport:VcfExporter.kt$import ezvcard.property.*</ID>
     <ID>WildcardImport:ViewContactActivity.kt$import org.fossify.commons.extensions.*</ID>
     <ID>WildcardImport:ViewContactActivity.kt$import org.fossify.commons.helpers.*</ID>
     <ID>WildcardImport:ViewContactActivity.kt$import org.fossify.commons.models.contacts.*</ID>
