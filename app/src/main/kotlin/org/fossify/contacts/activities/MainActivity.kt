@@ -426,8 +426,8 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
                 updateBottomTabItemColors(it.customView, false, getDeselectedTabDrawableIds()[it.position])
             },
             tabSelectedAction = {
-                getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
                 binding.viewPager.currentItem = it.position
+                getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
                 updateBottomTabItemColors(it.customView, true, getSelectedTabDrawableIds()[it.position])
             }
         )
