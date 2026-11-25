@@ -140,6 +140,7 @@ class EditContactActivity : ContactActivity() {
         private const val INTENT_TAKE_PHOTO = 1
         private const val INTENT_CHOOSE_PHOTO = 2
         private const val INTENT_CROP_PHOTO = 3
+        private const val LAST_PHOTO_INTENT_URI = "last_photo_intent_uri"
 
         private const val TAKE_PHOTO = 1
         private const val CHOOSE_PHOTO = 2
@@ -166,6 +167,7 @@ class EditContactActivity : ContactActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedInstanceState?.getString(LAST_PHOTO_INTENT_URI)?.let { lastPhotoIntentUri = Uri.parse(it) }
         setContentView(binding.root)
 
         if (checkAppSideloading()) {
@@ -208,9 +210,16 @@ class EditContactActivity : ContactActivity() {
         if (resultCode == RESULT_OK) {
             when (requestCode) {
                 INTENT_TAKE_PHOTO, INTENT_CHOOSE_PHOTO -> startCropPhotoIntent(lastPhotoIntentUri, resultData?.data)
-                INTENT_CROP_PHOTO -> updateContactPhoto(lastPhotoIntentUri.toString(), binding.contactPhoto, binding.contactPhotoBottomShadow)
+                INTENT_CROP_PHOTO -> lastPhotoIntentUri?.let {
+                    updateContactPhoto(it.toString(), binding.contactPhoto, binding.contactPhotoBottomShadow)
+                }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        lastPhotoIntentUri?.let { outState.putString(LAST_PHOTO_INTENT_URI, it.toString()) }
     }
 
     private fun initContact() {
@@ -460,24 +469,36 @@ class EditContactActivity : ContactActivity() {
             return
         }
 
-        var imageUri = primaryUri
-        var bitmap = MediaStore.Images.Media.getBitmap(contentResolver, primaryUri)
-        if (bitmap == null) {
-            imageUri = backupUri
-            try {
-                bitmap = MediaStore.Images.Media.getBitmap(contentResolver, backupUri) ?: return
-            } catch (e: Exception) {
-                showErrorToast(e)
-                return
+        ensureBackgroundThread {
+            val imageUri = readableImageUri(primaryUri, backupUri)
+            runOnUiThread {
+                if (imageUri != null && !isFinishing && !isDestroyed) {
+                    launchCropIntent(imageUri)
+                }
             }
-
-            // we might have received an URI which we have no permission to send further, so just copy the received image in a new uri (for example from Google Photos)
-            val newFile = getCachePhoto()
-            val fos = newFile.outputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-            imageUri = getCachePhotoUri(newFile)
         }
+    }
 
+    /**
+     * [primaryUri] if it decodes, else a cache copy of [backupUri]: we may lack permission to pass the backup on
+     * (for example an image from Google Photos). Null on failure.
+     */
+    private fun readableImageUri(primaryUri: Uri, backupUri: Uri?): Uri? = try {
+        if (MediaStore.Images.Media.getBitmap(contentResolver, primaryUri) != null) {
+            primaryUri
+        } else {
+            MediaStore.Images.Media.getBitmap(contentResolver, backupUri)?.let { bitmap ->
+                val newFile = getCachePhoto()
+                newFile.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
+                getCachePhotoUri(newFile)
+            }
+        }
+    } catch (e: Exception) {
+        showErrorToast(e)
+        null
+    }
+
+    private fun launchCropIntent(imageUri: Uri) {
         hideKeyboard()
         lastPhotoIntentUri = getCachePhotoUri()
         Intent("com.android.camera.action.CROP").apply {
