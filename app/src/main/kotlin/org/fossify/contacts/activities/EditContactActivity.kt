@@ -1200,16 +1200,18 @@ class EditContactActivity : ContactActivity() {
         val newPrimary = contactValues.phoneNumbers.find { it.isPrimary }
         val primaryState = Pair(oldPrimary, newPrimary)
 
+        val previous = contact
+        isSaving = true
         contact = contactValues
 
         ensureBackgroundThread {
             config.lastUsedContactSource = contact!!.source
             when {
-                contact!!.id == 0 -> insertNewContact(false)
-                originalContactSource != contact!!.source -> insertNewContact(true)
+                contact!!.id == 0 -> insertNewContact(false, previous)
+                originalContactSource != contact!!.source -> insertNewContact(true, previous)
                 else -> {
                     val photoUpdateStatus = getPhotoUpdateStatus(oldPhotoUri, contact!!.photoUri)
-                    updateContact(photoUpdateStatus, primaryState)
+                    updateContact(photoUpdateStatus, primaryState, previous)
                 }
             }
         }
@@ -1381,8 +1383,7 @@ class EditContactActivity : ContactActivity() {
         return websites
     }
 
-    private fun insertNewContact(deleteCurrentContact: Boolean) {
-        isSaving = true
+    private fun insertNewContact(deleteCurrentContact: Boolean, previous: Contact?) {
         if (!deleteCurrentContact) {
             toast(R.string.inserting)
         }
@@ -1391,39 +1392,47 @@ class EditContactActivity : ContactActivity() {
             if (deleteCurrentContact) {
                 contact!!.source = originalContactSource
                 ContactsHelper(this).deleteContact(contact!!, false) {
-                    setResult(Activity.RESULT_OK)
-                    hideKeyboard()
-                    finish()
+                    finishSaved()
                 }
             } else {
-                setResult(Activity.RESULT_OK)
-                hideKeyboard()
-                finish()
+                finishSaved()
             }
         } else {
-            toast(org.fossify.commons.R.string.unknown_error_occurred)
+            saveFailed(previous)
         }
     }
 
-    private fun updateContact(photoUpdateStatus: Int, primaryState: Pair<PhoneNumber?, PhoneNumber?>) {
-        isSaving = true
+    private fun updateContact(
+        photoUpdateStatus: Int,
+        primaryState: Pair<PhoneNumber?, PhoneNumber?>,
+        previous: Contact?
+    ) {
         RawContactLoader(this).ensureNameRow(contact!!)
         if (ContactsHelper(this@EditContactActivity).updateContact(contact!!, photoUpdateStatus)) {
             val status = getPrimaryNumberStatus(primaryState.first, primaryState.second)
             if (status != PrimaryNumberStatus.UNCHANGED) {
                 updateDefaultNumberForDuplicateContacts(primaryState, status) {
-                    setResult(Activity.RESULT_OK)
-                    hideKeyboard()
-                    finish()
+                    finishSaved()
                 }
             } else {
-                setResult(Activity.RESULT_OK)
-                hideKeyboard()
-                finish()
+                finishSaved()
             }
         } else {
-            toast(org.fossify.commons.R.string.unknown_error_occurred)
+            saveFailed(previous)
         }
+    }
+
+    private fun finishSaved() = runOnUiThread {
+        setResult(Activity.RESULT_OK)
+        hideKeyboard()
+        finish()
+    }
+
+    /** Puts back the contact from before the save, so the edits still count as unsaved, and allows another try. */
+    private fun saveFailed(previous: Contact?) = runOnUiThread {
+        contact = previous
+        isSaving = false
+        toast(org.fossify.commons.R.string.unknown_error_occurred)
     }
 
     private fun updateDefaultNumberForDuplicateContacts(
