@@ -213,7 +213,10 @@ fun addNamelessContacts(
     return ArrayList(listed + shown)
 }
 
-/** How nameless contacts join a list; mirrors commons ContactsHelper.getContacts for named ones. */
+/**
+ * How nameless contacts join a list; mirrors commons ContactsHelper.getContacts for named ones.
+ * [mergeLinked] also decides whether named contacts are merged by name (getContactsWithNameless).
+ */
 data class NamelessRules(val mergeLinked: Boolean, val onlyWithNumbers: Boolean)
 
 fun namelessRules(
@@ -226,13 +229,22 @@ fun namelessRules(
     onlyWithNumbers = showOnlyWithNumbers && ignoredContactSources.isEmpty()
 )
 
+/** A contact with nothing to show as a name matches every other such contact by hash, so it has no duplicates. */
+fun canHaveDuplicates(contact: Contact) = contact.getNameToDisplay().isNotBlank()
+
 /**
  * The nameless contacts commons getDuplicatesOfContact would call duplicates of [contact], if it could load them.
  * Private contacts have their own id space, so only a device contact is excluded by id.
+ * A contact with no display name has none (see [canHaveDuplicates]).
  */
 fun namelessDuplicatesOf(contact: Contact, nameless: List<Contact>): List<Contact> {
+    if (!canHaveDuplicates(contact)) {
+        return emptyList()
+    }
     val hash = contact.getHashToCompare()
-    return nameless.filter { (contact.isPrivate() || it.id != contact.id) && it.getHashToCompare() == hash }
+    return nameless.filter {
+        canHaveDuplicates(it) && (contact.isPrivate() || it.id != contact.id) && it.getHashToCompare() == hash
+    }
 }
 
 private typealias DataReader = (contact: Contact, cursor: Cursor) -> Unit

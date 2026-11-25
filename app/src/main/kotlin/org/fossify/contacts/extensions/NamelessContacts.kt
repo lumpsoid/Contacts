@@ -11,6 +11,7 @@ import org.fossify.commons.models.contacts.Contact
 import org.fossify.contacts.helpers.ContactLinkHelper
 import org.fossify.contacts.helpers.RawContactLoader
 import org.fossify.contacts.helpers.addNamelessContacts
+import org.fossify.contacts.helpers.canHaveDuplicates
 import org.fossify.contacts.helpers.mergeDuplicatesByName
 import org.fossify.contacts.helpers.namelessDuplicatesOf
 import org.fossify.contacts.helpers.namelessRules
@@ -33,9 +34,15 @@ fun Context.getContactsWithNameless(
     showOnlyContactsWithNumbers: Boolean = config.showOnlyContactsWithNumbers,
     callback: (ArrayList<Contact>) -> Unit
 ) {
+    val rules = namelessRules(
+        getAll = getAll,
+        ignoredContactSources = ignoredContactSources,
+        mergeDuplicates = config.mergeDuplicateContacts,
+        showOnlyWithNumbers = showOnlyContactsWithNumbers
+    )
     // commons merges same-name contacts only in this case; merge here instead,
     // so contacts the system keeps apart stay apart
-    val mergeByName = config.mergeDuplicateContacts && ignoredContactSources.isEmpty() && !getAll
+    val mergeByName = rules.mergeLinked
     val loadAll = getAll || mergeByName
     ContactsHelper(this).getContacts(loadAll, false, ignoredContactSources, showOnlyContactsWithNumbers) { contacts ->
         ensureBackgroundThread {
@@ -49,12 +56,6 @@ fun Context.getContactsWithNameless(
             } else {
                 contacts
             }
-            val rules = namelessRules(
-                getAll = getAll,
-                ignoredContactSources = ignoredContactSources,
-                mergeDuplicates = config.mergeDuplicateContacts,
-                showOnlyWithNumbers = showOnlyContactsWithNumbers
-            )
             val namelessIgnored = if (getAll) ignoredContactSources else baseConfig.ignoredContactSources
             val result = addNamelessContacts(
                 listed = listed,
@@ -70,6 +71,10 @@ fun Context.getContactsWithNameless(
 
 /** Commons getDuplicatesOfContact, plus the nameless raw contacts it cannot load. */
 fun Context.getDuplicatesOfContactWithNameless(contact: Contact, callback: (ArrayList<Contact>) -> Unit) {
+    if (!canHaveDuplicates(contact)) {
+        Handler(Looper.getMainLooper()).post { callback(ArrayList()) }
+        return
+    }
     ContactsHelper(this).getDuplicatesOfContact(contact, false) { duplicates ->
         ensureBackgroundThread {
             val nameless = RawContactLoader(this).getNamelessContacts(HashSet())
