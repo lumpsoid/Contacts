@@ -39,7 +39,10 @@ private val extraPhoneTypes = mapOf(
     Phone.TYPE_WORK_MOBILE to X_WORK_MOBILE,
     Phone.TYPE_WORK_PAGER to X_WORK_PAGER,
 )
-private val extraPhoneTypeIdsByName = extraPhoneTypes.entries.associate { (typeId, name) -> name to typeId }
+/** The reverse of [extraPhoneTypes], plus the bare CAR and ISDN names, which are read but never written. */
+private val extraPhoneTypeIdsByName =
+    extraPhoneTypes.entries.associate { (typeId, name) -> name to typeId } +
+        mapOf(CAR to Phone.TYPE_CAR, ISDN to Phone.TYPE_ISDN)
 
 internal fun phoneTypeId(type: String, subtype: String?): Int =
     when (type.uppercase(Locale.ROOT)) {
@@ -66,8 +69,6 @@ internal fun phoneTypeId(type: String, subtype: String?): Int =
         FAX -> if (subtype?.uppercase(Locale.ROOT) == HOME) Phone.TYPE_FAX_HOME else Phone.TYPE_FAX_WORK
         PAGER -> Phone.TYPE_PAGER
         OTHER -> Phone.TYPE_OTHER
-        CAR -> Phone.TYPE_CAR
-        ISDN -> Phone.TYPE_ISDN
         else -> extraPhoneTypeIdsByName[type.uppercase(Locale.ROOT)] ?: Phone.TYPE_CUSTOM
     }
 

@@ -126,6 +126,13 @@ class VcardRoundTripTest {
     }
 
     @Test
+    fun extraPhoneTypesHaveTheirXNames() {
+        assertEquals(listOf("X-CAR"), phoneTypeNames(CommonDataKinds.Phone.TYPE_CAR, ""))
+        assertEquals(listOf("X-TTY-TDD"), phoneTypeNames(CommonDataKinds.Phone.TYPE_TTY_TDD, ""))
+        assertEquals(listOf("X-WORK-PAGER"), phoneTypeNames(CommonDataKinds.Phone.TYPE_WORK_PAGER, ""))
+    }
+
+    @Test
     fun notesAndOrganizationSurvive() {
         val contact = Contact(
             id = 0,
