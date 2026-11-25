@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.ContactsHelper
+import org.fossify.commons.helpers.LocalContactsHelper
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.contacts.Contact
@@ -21,13 +22,16 @@ import org.fossify.contacts.extensions.handleGenericContactClick
 import org.fossify.contacts.extensions.viewContact
 import org.fossify.contacts.helpers.GROUP
 import org.fossify.contacts.helpers.LOCATION_GROUP_CONTACTS
+import org.fossify.contacts.helpers.inSources
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import org.fossify.contacts.interfaces.RemoveFromGroupListener
+import java.util.concurrent.atomic.AtomicInteger
 
 class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, RefreshContactsListener {
     private var allContacts = ArrayList<Contact>()
     private var groupContacts = ArrayList<Contact>()
     private var wasInit = false
+    private val loadGeneration = AtomicInteger()
     private val binding by viewBinding(ActivityGroupContactsBinding::inflate)
     lateinit var group: Group
 
@@ -109,15 +113,26 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     }
 
     private fun refreshContacts() {
-        getContactsWithNameless {
-            wasInit = true
-            allContacts = it
-
-            groupContacts = it.filter { it.groups.map { it.id }.contains(group.id) } as ArrayList<Contact>
-            binding.groupContactsPlaceholder2.beVisibleIf(groupContacts.isEmpty())
-            binding.groupContactsPlaceholder.beVisibleIf(groupContacts.isEmpty())
-            binding.groupContactsFastscroller.beVisibleIf(groupContacts.isNotEmpty())
-            updateContacts(groupContacts)
+        val generation = loadGeneration.incrementAndGet()
+        getContactsWithNameless { contacts ->
+            ensureBackgroundThread {
+                val visible = contacts.inSources(getVisibleContactSources())
+                val inGroup: ArrayList<Contact> = visible.filterTo(ArrayList()) { contact ->
+                    contact.groups.any { it.id == group.id }
+                }
+                runOnUiThread {
+                    if (isDestroyed || isFinishing || generation != loadGeneration.get()) {
+                        return@runOnUiThread
+                    }
+                    wasInit = true
+                    allContacts = visible
+                    groupContacts = inGroup
+                    binding.groupContactsPlaceholder2.beVisibleIf(groupContacts.isEmpty())
+                    binding.groupContactsPlaceholder.beVisibleIf(groupContacts.isEmpty())
+                    binding.groupContactsFastscroller.beVisibleIf(groupContacts.isNotEmpty())
+                    updateContacts(groupContacts)
+                }
+            }
         }
     }
 
@@ -185,8 +200,10 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     override fun removeFromGroup(contacts: ArrayList<Contact>) {
         ensureBackgroundThread {
             removeContactsFromGroup(contacts, group.id!!)
-            if (groupContacts.size == contacts.size) {
-                refreshContacts()
+            runOnUiThread {
+                if (!isDestroyed && !isFinishing) {
+                    refreshContacts()
+                }
             }
         }
     }
@@ -206,8 +223,16 @@ class GroupContactsActivity : SimpleActivity(), RemoveFromGroupListener, Refresh
     }
 
     private fun setRingtoneOnSelected(uri: Uri) {
-        groupContacts.forEach {
-            ContactsHelper(this).updateRingtone(it.contactId.toString(), uri.toString())
+        val contacts = ArrayList(groupContacts)
+        val ringtone = uri.toString()
+        ensureBackgroundThread {
+            contacts.forEach {
+                if (it.isPrivate()) {
+                    LocalContactsHelper(this).updateRingtone(it.contactId, ringtone)
+                } else {
+                    ContactsHelper(this).updateRingtone(it.contactId.toString(), ringtone)
+                }
+            }
         }
     }
 }

@@ -30,6 +30,9 @@ class CreateNewGroupDialog(val activity: BaseSimpleActivity, val callback: (newG
                             return@OnClickListener
                         }
 
+                        val okButton = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                        okButton.isEnabled = false
+
                         val contactSources = ArrayList<ContactSource>()
                         ContactsHelper(activity).getContactSources {
                             it.mapTo(contactSources) { ContactSource(it.name, it.type, it.publicName) }
@@ -43,6 +46,7 @@ class CreateNewGroupDialog(val activity: BaseSimpleActivity, val callback: (newG
                                 if (items.size == 1) {
                                     createGroupUnder(name, contactSources.first(), alertDialog)
                                 } else {
+                                    okButton.isEnabled = true
                                     RadioGroupDialog(activity, items, titleId = R.string.create_group_under_account) {
                                         val contactSource = contactSources[it as Int]
                                         createGroupUnder(name, contactSource, alertDialog)
@@ -56,6 +60,7 @@ class CreateNewGroupDialog(val activity: BaseSimpleActivity, val callback: (newG
     }
 
     private fun createGroupUnder(name: String, contactSource: ContactSource, dialog: AlertDialog) {
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
         ensureBackgroundThread {
             val newGroup = ContactsHelper(activity).createNewGroup(name, contactSource.name, contactSource.type)
             activity.runOnUiThread {

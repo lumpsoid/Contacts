@@ -271,6 +271,7 @@ class ContactsAdapter(
         contactItems.removeAll(contactsToRemove)
 
         if (location == LOCATION_FAVORITES_TAB) {
+            contactsToRemove.forEach { it.starred = 0 }
             ContactsHelper(activity).removeFavorites(contactsToRemove)
             if (contactItems.isEmpty()) {
                 refreshListener?.refreshContacts(TAB_FAVORITES)
