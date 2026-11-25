@@ -32,10 +32,15 @@ class DuplicateScanner(private val context: Context) {
         }
     }
 
-    /** Accounts this app can save into, the private phone storage included, with their access. Blocking. */
+    /**
+     * Accounts this app can save into, the private phone storage included, with their access. Blocking.
+     * An account whose name another account also carries is left out: commons resolves the account by name.
+     */
     fun writableSources(): List<Pair<ContactSource, AccountAccess>> {
         val readOnly = readOnlyAdapterTypes()
-        val sources = ContactsHelper(context).getDeviceContactSources() + context.getPrivateContactSource()
+        val deviceSources = ContactsHelper(context).getDeviceContactSources().toList()
+        val usable = deviceSources.filter { accountTypeOf(it.name, deviceSources) != null }
+        val sources = usable + context.getPrivateContactSource()
         return sources.map { it to AccountAccess.of(it.type, readOnly) }.filter { it.second.isWritable() }
     }
 
