@@ -17,6 +17,7 @@ import org.fossify.commons.helpers.ContactsHelper
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.RadioItem
+import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.contacts.R
 import org.fossify.contacts.adapters.DedupeAdapter
@@ -26,6 +27,8 @@ import org.fossify.contacts.extensions.config
 import org.fossify.contacts.helpers.DedupeSelection
 import org.fossify.contacts.helpers.DuplicateScanner
 import org.fossify.contacts.helpers.MergeRunner
+import org.fossify.contacts.helpers.ProviderMergeStore
+import org.fossify.contacts.helpers.exportMergeBackup
 import org.fossify.contacts.helpers.mergeBackupFileName
 import org.fossify.contacts.helpers.preferredDestination
 import org.fossify.contacts.helpers.summarize
@@ -45,6 +48,7 @@ class DedupeActivity : SimpleActivity() {
     private val cancelled = AtomicBoolean(false)
     private var pendingDestination: Pair<ContactSource, AccountAccess>? = null
     private var destinationName = ""
+    private var runBackupUri: Uri? = null
     private val backupPicker = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/x-vcard")
     ) { uri ->
@@ -170,6 +174,7 @@ class DedupeActivity : SimpleActivity() {
     private fun startRun(destination: Pair<ContactSource, AccountAccess>, backupUri: Uri?) {
         val plans = selection?.plans().orEmpty()
         destinationName = destination.first.publicName
+        runBackupUri = backupUri
         cancelled.set(false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.dedupeList.beGone()
@@ -177,7 +182,11 @@ class DedupeActivity : SimpleActivity() {
         binding.dedupeProgressHolder.beVisible()
         binding.dedupeCancel.beVisible()
         binding.dedupeProgressLabel.text = getString(R.string.dedupe_merging, 0, plans.size)
-        val runner = MergeRunner(applicationContext)
+        val store = ProviderMergeStore(applicationContext)
+        val runner = MergeRunner(store) { applicationContext.showErrorToast(it) }
+        val backUp = backupUri?.let { uri ->
+            { contacts: ArrayList<Contact> -> applicationContext.exportMergeBackup(contacts, uri) }
+        }
         val onProgress = { done: Int, total: Int ->
             runOnUiThread {
                 if (!isDestroyed) {
@@ -187,7 +196,7 @@ class DedupeActivity : SimpleActivity() {
         }
         ensureBackgroundThread {
             val result = runner.run(
-                plans, destination.first, destination.second, backupUri, { cancelled.get() }, onProgress
+                plans, destination.first, destination.second, backUp, { cancelled.get() }, onProgress
             )
             runOnUiThread {
                 if (!isDestroyed) {
@@ -216,7 +225,7 @@ class DedupeActivity : SimpleActivity() {
             } catch (e: ActivityNotFoundException) {
                 showErrorToast(e)
             }
-        }.show(result, names, destinationName)
+        }.show(result, names, destinationName, runBackupUri)
     }
 
     companion object {

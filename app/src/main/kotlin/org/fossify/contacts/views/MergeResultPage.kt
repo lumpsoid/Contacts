@@ -27,8 +27,11 @@ class MergeResultPage(
     private val warningColor = activity.getColor(org.fossify.commons.R.color.md_orange_700)
     private val errorColor = activity.getColor(org.fossify.commons.R.color.md_red_700)
 
-    /** [names]: display name by plan key; [destinationName]: the account the run saved into. */
-    fun show(result: MergeRunResult, names: Map<String, String>, destinationName: String) {
+    /**
+     * [names]: display name by plan key; [destinationName]: the account the run saved into.
+     * [backupUri]: where the backup was written, shown when the run backed up.
+     */
+    fun show(result: MergeRunResult, names: Map<String, String>, destinationName: String, backupUri: Uri?) {
         activity.updateTextColors(binding.root)
         when (result) {
             is MergeRunResult.BackupFailed -> {
@@ -37,11 +40,16 @@ class MergeResultPage(
                 binding.dedupeResultStats.beGone()
             }
 
-            is MergeRunResult.Finished -> showFinished(result, names, destinationName)
+            is MergeRunResult.Finished -> showFinished(result, names, destinationName, backupUri)
         }
     }
 
-    private fun showFinished(result: MergeRunResult.Finished, names: Map<String, String>, destinationName: String) {
+    private fun showFinished(
+        result: MergeRunResult.Finished,
+        names: Map<String, String>,
+        destinationName: String,
+        backupUri: Uri?
+    ) {
         val merged = result.mergedCount()
         val failures = result.failures()
         val subtitle = if (merged > 0) activity.getString(R.string.dedupe_result_saved_to, destinationName) else ""
@@ -59,7 +67,7 @@ class MergeResultPage(
         binding.dedupeResultNote.beVisibleIf(result.cancelled)
 
         showFailures(failures, names)
-        showBackup(result.backupUri)
+        showBackup(if (result.backedUp) backupUri else null)
     }
 
     private fun showStatus(iconId: Int, color: Int, titleId: Int, subtitle: String) {

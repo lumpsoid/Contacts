@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.SQLException
 import android.net.Uri
 import org.fossify.commons.extensions.showErrorToast
+import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.contacts.models.AccountAccess
 import org.fossify.contacts.models.MergeFailure
@@ -14,20 +15,24 @@ import org.joda.time.DateTime
 import java.io.IOException
 
 /** Owns the order of a merge run: backup first, then one plan at a time until done or cancelled. */
-class MergeRunner(private val context: Context) {
-    /** Blocking. [onProgress] gets (done, total) after each plan. */
+class MergeRunner(private val store: MergeStore, private val onError: (Exception) -> Unit) {
+    /**
+     * Blocking. [onProgress] gets (done, total) after each plan.
+     * [backUp] gets every record of the run once and says whether the backup was written;
+     * null runs without a backup.
+     */
     fun run(
         plans: List<MergePlan>,
         destination: ContactSource,
         access: AccountAccess,
-        backupUri: Uri?,
+        backUp: ((ArrayList<Contact>) -> Boolean)?,
         isCancelled: () -> Boolean,
         onProgress: (done: Int, total: Int) -> Unit
     ): MergeRunResult {
-        if (backupUri != null && !backUp(plans, backupUri)) {
+        if (backUp != null && !backUp(backupContacts(plans))) {
             return MergeRunResult.BackupFailed
         }
-        val writer = DedupeWriter(context)
+        val writer = DedupeWriter(store)
         val outcomes = ArrayList<MergeOutcome>()
         for (plan in plans) {
             if (isCancelled()) {
@@ -36,7 +41,7 @@ class MergeRunner(private val context: Context) {
             outcomes.add(mergeSafely(writer, plan, destination, access))
             onProgress(outcomes.size, plans.size)
         }
-        return MergeRunResult.Finished(outcomes, backupUri, total = plans.size)
+        return MergeRunResult.Finished(outcomes, backedUp = backUp != null, total = plans.size)
     }
 
     /** Merges [plan]; an unexpected error fails only this plan, so the rest of the run goes on. */
@@ -49,38 +54,41 @@ class MergeRunner(private val context: Context) {
         return try {
             writer.merge(plan, destination, access)
         } catch (e: SQLException) {
-            context.showErrorToast(e)
+            onError(e)
             MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
         } catch (e: IllegalStateException) {
-            context.showErrorToast(e)
+            onError(e)
             MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
         } catch (e: IllegalArgumentException) {
-            context.showErrorToast(e)
+            onError(e)
             MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
         } catch (e: SecurityException) {
-            context.showErrorToast(e)
+            onError(e)
             MergeOutcome.Failed(plan.key, MergeFailure.ERROR)
         }
     }
 
-    private fun backUp(plans: List<MergePlan>, uri: Uri): Boolean {
-        val contacts = ArrayList(plans.flatMap { it.records }.distinctBy { it.key }.map { it.contact })
-        var exported = false
-        try {
-            context.contentResolver.openOutputStream(uri)?.use { stream ->
-                VcfExporter().exportContacts(context, stream, contacts, showExportingToast = false) {
-                    exported = it == VcfExporter.ExportResult.EXPORT_OK
-                }
+    private fun backupContacts(plans: List<MergePlan>): ArrayList<Contact> =
+        ArrayList(plans.flatMap { it.records }.distinctBy { it.key }.map { it.contact })
+}
+
+/** Writes [contacts] as a vCard backup to [uri]; true only when every contact was exported. Blocking. */
+fun Context.exportMergeBackup(contacts: ArrayList<Contact>, uri: Uri): Boolean {
+    var exported = false
+    try {
+        contentResolver.openOutputStream(uri)?.use { stream ->
+            VcfExporter().exportContacts(this, stream, contacts, showExportingToast = false) {
+                exported = it == VcfExporter.ExportResult.EXPORT_OK
             }
-        } catch (e: IOException) {
-            exported = false
-            context.showErrorToast(e)
-        } catch (e: SecurityException) {
-            exported = false
-            context.showErrorToast(e)
         }
-        return exported
+    } catch (e: IOException) {
+        exported = false
+        showErrorToast(e)
+    } catch (e: SecurityException) {
+        exported = false
+        showErrorToast(e)
     }
+    return exported
 }
 
 /** File name the backup picker suggests: merge-2026-11-24-1830.vcf. */
