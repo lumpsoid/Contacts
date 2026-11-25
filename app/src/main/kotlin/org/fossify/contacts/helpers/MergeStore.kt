@@ -17,8 +17,11 @@ interface MergeStore {
     /** Writes [merged] over the stored [target]; false when the write failed. */
     fun update(merged: Contact, target: MergeRecord): Boolean
 
-    /** Inserts [merged] into [destination]; its new id, or null when the insert failed. */
-    fun insert(merged: Contact, destination: ContactSource): Int?
+    /**
+     * Inserts [merged] into [destination]; the ids of the [destination] records newer than before the insert,
+     * the new one among them (a sync adapter may add others meanwhile), or null when the insert failed.
+     */
+    fun insert(merged: Contact, destination: ContactSource): List<Int>?
 
     /** The stored record [id] of [destination], or null when it cannot be read. */
     fun readBack(id: Int, destination: ContactSource): Contact?

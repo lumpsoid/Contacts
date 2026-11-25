@@ -63,17 +63,23 @@ class DedupeWriter(private val store: MergeStore) {
 
     /** Updates [target] or inserts [merged] new, and returns its id only when reading it back verifies. */
     private fun writeVerified(merged: Contact, target: MergeRecord?, destination: ContactSource): Int? {
-        val id = if (target != null) {
-            if (store.update(merged, target)) target.contact.id else null
-        } else {
-            store.insert(merged, destination)
-        }
-        if (id == null) return null
-        val written = store.readBack(id, destination)
-        if (written != null && verifyMerged(merged, written)) return id
-        if (target == null) store.delete(listOf(merged.copy(id = id)))
-        return null
+        if (target == null) return insertVerified(merged, destination)
+        if (!store.update(merged, target)) return null
+        return target.contact.id.takeIf { isStored(merged, it, destination) }
     }
+
+    /**
+     * Inserts [merged] and returns the new record that verifies; deletes a failed insert only when it is unambiguous.
+     */
+    private fun insertVerified(merged: Contact, destination: ContactSource): Int? {
+        val newIds = store.insert(merged, destination) ?: return null
+        val id = newIds.firstOrNull { isStored(merged, it, destination) }
+        if (id == null && newIds.size == 1) store.delete(listOf(merged.copy(id = newIds.single())))
+        return id
+    }
+
+    private fun isStored(merged: Contact, id: Int, destination: ContactSource): Boolean =
+        store.readBack(id, destination)?.let { verifyMerged(merged, it) } == true
 
     /** Private contacts are not in the system provider, so they cannot be linked. */
     private fun link(resultId: Int, isPrivate: Boolean, rawIds: List<Int>): Boolean =

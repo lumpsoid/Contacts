@@ -58,10 +58,10 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         return linked.isEmpty() || memberships.restore(target.contact, linked)
     }
 
-    override fun insert(merged: Contact, destination: ContactSource): Int? {
-        val before = newestRecordId(destination)
+    override fun insert(merged: Contact, destination: ContactSource): List<Int>? {
+        val before = recordIdsAfter(0, destination).lastOrNull() ?: 0
         if (!ContactsHelper(context).insertContact(merged)) return null
-        return newestRecordId(destination).takeIf { it > before }
+        return recordIdsAfter(before, destination)
     }
 
     override fun readBack(id: Int, destination: ContactSource): Contact? {
@@ -114,36 +114,39 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         }
     }
 
-    /** The largest raw id in the [destination] account, or 0 when there is none. */
-    private fun newestRecordId(destination: ContactSource): Int {
+    /** Raw ids above [after] in [destination], ascending. */
+    private fun recordIdsAfter(after: Int, destination: ContactSource): List<Int> {
         if (destination.type == SMT_PRIVATE) {
-            return LocalContactsHelper(context).getAllContacts().maxOfOrNull { it.id } ?: 0
+            return LocalContactsHelper(context).getAllContacts().map { it.id }.filter { it > after }.sorted()
         }
-        var newest = 0
+        var ids: List<Int> = emptyList()
         val projection = arrayOf(RawContacts._ID, RawContacts.ACCOUNT_NAME, RawContacts.ACCOUNT_TYPE)
-        val selection = "${RawContacts.DELETED} = 0"
-        val sortOrder = "${RawContacts._ID} DESC"
+        val selection = "${RawContacts.DELETED} = 0 AND ${RawContacts._ID} > ?"
+        val sortOrder = "${RawContacts._ID} ASC"
         try {
-            context.contentResolver.query(RawContacts.CONTENT_URI, projection, selection, null, sortOrder)?.use {
-                newest = firstOwnId(it, destination)
+            context.contentResolver.query(
+                RawContacts.CONTENT_URI, projection, selection, arrayOf(after.toString()), sortOrder
+            )?.use {
+                ids = ownIds(it, destination)
             }
         } catch (e: SecurityException) {
             context.showErrorToast(e)
         } catch (e: IllegalArgumentException) {
             context.showErrorToast(e)
         }
-        return newest
+        return ids
     }
 }
 
-/** The id of the first row of [cursor] in the [destination] account, or 0 when there is none. */
-private fun firstOwnId(cursor: Cursor, destination: ContactSource): Int {
+/** The ids of the rows of [cursor] in the [destination] account, in cursor order. */
+private fun ownIds(cursor: Cursor, destination: ContactSource): List<Int> {
+    val ids = ArrayList<Int>()
     while (cursor.moveToNext()) {
         val accountName = cursor.getString(ACCOUNT_NAME_COLUMN) ?: ""
         val accountType = cursor.getString(ACCOUNT_TYPE_COLUMN) ?: ""
         if (accountName == destination.name && accountType == destination.type) {
-            return cursor.getInt(ID_COLUMN)
+            ids.add(cursor.getInt(ID_COLUMN))
         }
     }
-    return 0
+    return ids
 }
