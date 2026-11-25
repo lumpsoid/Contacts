@@ -1,11 +1,8 @@
 package org.fossify.contacts.activities
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.view.WindowManager
 import androidx.activity.result.contract.ActivityResultContracts
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.beGone
@@ -35,14 +32,14 @@ import org.fossify.contacts.helpers.mergeBackupFileName
 import org.fossify.contacts.helpers.preferredDestination
 import org.fossify.contacts.helpers.summarize
 import org.fossify.contacts.models.AccountAccess
-import org.fossify.contacts.models.MergeRunResult
 import org.fossify.contacts.models.ScanResult
-import org.fossify.contacts.views.MergeResultPage
+import org.fossify.contacts.views.MergeRunScreen
 import org.joda.time.DateTime
 
 /** Lists the duplicate contacts found on the device, so the user can pick which ones to merge. */
 class DedupeActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityDedupeBinding::inflate)
+    private val runScreen by lazy { MergeRunScreen(this, binding) }
     private var selection: DedupeSelection? = null
     private var accountNames: Map<String, String> = emptyMap()
     private var restoredState: ArrayList<String>? = null
@@ -71,7 +68,7 @@ class DedupeActivity : SimpleActivity() {
         }
         restoredState = savedInstanceState?.getStringArrayList(SELECTION_STATE)
         val hadSession = MergeSession.state != null
-        MergeSession.observe(this) { state -> runOnUiThread { if (!isDestroyed) showState(state) } }
+        MergeSession.observe(this) { state -> runOnUiThread { if (!isDestroyed) runScreen.show(state) } }
         if (!hadSession) startScan()
     }
 
@@ -183,7 +180,7 @@ class DedupeActivity : SimpleActivity() {
     /** Merges on a background thread through [MergeSession]; leaving the screen does not stop or drop the run. */
     private fun startRun(destination: Pair<ContactSource, AccountAccess>, backupUri: Uri?) {
         val plans = selection?.plans().orEmpty()
-        val labels = MergeSession.Labels(planNames(), destination.first.publicName, backupUri)
+        val labels = MergeSession.Labels(selection?.planNames().orEmpty(), destination.first.publicName, backupUri)
         val store = ProviderMergeStore(applicationContext)
         val runner = MergeRunner(store) { applicationContext.showErrorToast(it) }
         val backUp = backupUri?.let { uri ->
@@ -193,50 +190,6 @@ class DedupeActivity : SimpleActivity() {
             runner.run(plans, destination.first, destination.second, backUp, isCancelled, onProgress)
         }
     }
-
-    /** Shows what the session is doing: the merge progress, or its result. */
-    private fun showState(state: MergeSession.State) {
-        when (state) {
-            is MergeSession.State.Running -> showRunning(state.done, state.total)
-            is MergeSession.State.Done -> showResult(state.result, state.labels)
-        }
-    }
-
-    private fun showRunning(done: Int, total: Int) {
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        binding.dedupeList.beGone()
-        binding.dedupeBottomBar.beGone()
-        binding.dedupeEmptyHolder.beGone()
-        binding.dedupeProgressHolder.beVisible()
-        binding.dedupeCancel.beVisible()
-        binding.dedupeProgressLabel.text = getString(R.string.dedupe_merging, done, total)
-    }
-
-    /** Shows the outcome of a run on the result page. */
-    private fun showResult(result: MergeRunResult, labels: MergeSession.Labels) {
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        binding.dedupeList.beGone()
-        binding.dedupeBottomBar.beGone()
-        binding.dedupeProgressHolder.beGone()
-        binding.dedupeCancel.beGone()
-        binding.dedupeResult.root.beVisible()
-        MergeResultPage(this, binding.dedupeResult) { backupUri ->
-            val intent = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(backupUri, "text/x-vcard")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            try {
-                startActivity(intent)
-            } catch (e: ActivityNotFoundException) {
-                showErrorToast(e)
-            }
-        }.show(result, labels.names, labels.destinationName, labels.backupUri)
-    }
-
-    /** The name of each duplicate and split plan's person, keyed as the plans are. */
-    private fun planNames(): Map<String, String> = selection?.result?.let { scan ->
-        scan.duplicates.associate { it.key to it.people.first().displayName() } +
-            scan.splitDetails.associate { it.key to it.person.displayName() }
-    }.orEmpty()
 
     companion object {
         private const val SELECTION_STATE = "dedupe_selection_state"

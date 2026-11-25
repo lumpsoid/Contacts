@@ -53,6 +53,11 @@ class DedupeSelection(val result: ScanResult) {
         return duplicates + splits
     }
 
+    /** Display name of each plan's group, by plan key. */
+    fun planNames(): Map<String, String> =
+        result.duplicates.associate { it.key to it.people.first().displayName() } +
+            result.splitDetails.associate { it.key to it.person.displayName() }
+
     /** Lines: "S<sep>key", "X<sep>key<sep>personKey", "C<sep>key<sep>FIELD<sep>recordKey", "B<sep>key". */
     fun saveState(): ArrayList<String> {
         val state = ArrayList<String>()
