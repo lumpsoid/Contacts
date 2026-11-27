@@ -180,9 +180,12 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
   detekt's CyclomaticComplexMethod limit.
 - Screens on the loop: `screens/viewcontact/` + `ViewContactActivity`
   (`ViewContactUpdateTest`); `screens/main/` + `MainActivity`, start page,
-  import intent and search session so far (`MainUpdateTest`). The list
-  rules the shared fragments apply are pure helpers
+  import intent and search session so far (`MainUpdateTest`);
+  `screens/editcontact/` + `EditContactActivity`, leaving only (back and
+  toolbar up: the unsaved-changes prompt and its throttle;
+  `EditContactUpdateTest`). The list rules the shared fragments apply are
+  pure helpers
   (`helpers/TabContents.kt`, `helpers/ContactSearch.kt`). The selection
   bar, delete targets and link mode of the shared `ContactsAdapter` are
   pure helpers too (`helpers/ContactSelection.kt`, `ContactSelectionTest`).
-- The edit form is read into a plain `FormSnapshot` (`helpers/EditForm.kt`) on save and back; the blank guard, building the Contact and label text -> type id (`helpers/EditFormTypes.kt`) are pure (`EditFormTest`, `EditFormTypesTest`). The edit screen is not on the loop yet.
+- The edit form is read into a plain `FormSnapshot` (`helpers/EditForm.kt`) on save and back; the blank guard, building the Contact and label text -> type id (`helpers/EditFormTypes.kt`) are pure (`EditFormTest`, `EditFormTypesTest`). The rest of the edit screen (load, save) is not on the loop yet.

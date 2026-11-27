@@ -75,7 +75,6 @@ import org.fossify.commons.helpers.PHOTO_ADDED
 import org.fossify.commons.helpers.PHOTO_CHANGED
 import org.fossify.commons.helpers.PHOTO_REMOVED
 import org.fossify.commons.helpers.PHOTO_UNCHANGED
-import org.fossify.commons.helpers.SAVE_DISCARD_PROMPT_INTERVAL
 import org.fossify.commons.helpers.SHOW_ADDRESSES_FIELD
 import org.fossify.commons.helpers.SHOW_CONTACT_SOURCE_FIELD
 import org.fossify.commons.helpers.SHOW_EMAILS_FIELD
@@ -146,6 +145,12 @@ import org.fossify.contacts.helpers.TypeLabels
 import org.fossify.contacts.helpers.TypedRow
 import org.fossify.contacts.helpers.streetForStructuredEdit
 import org.fossify.contacts.helpers.typeIdOf
+import org.fossify.contacts.screens.editcontact.BackFacts
+import org.fossify.contacts.screens.editcontact.EditContactAction
+import org.fossify.contacts.screens.editcontact.EditContactEffect
+import org.fossify.contacts.screens.editcontact.EditContactState
+import org.fossify.contacts.screens.editcontact.LeaveVia
+import org.fossify.contacts.screens.editcontact.update
 
 class EditContactActivity : ContactActivity() {
     companion object {
@@ -161,7 +166,7 @@ class EditContactActivity : ContactActivity() {
         private const val AUTO_COMPLETE_DELAY = 5000L
     }
 
-    private var mLastSavePromptTS = 0L
+    private var editState = EditContactState()
     private var wasActivityInitialized = false
     private var lastPhotoIntentUri: Uri? = null
     private var isSaving = false
@@ -402,31 +407,45 @@ class EditContactActivity : ContactActivity() {
     }
 
     override fun onBackPressedCompat(): Boolean {
-        if (isSaving) return true
-        maybeShowUnsavedChangesDialog {
-            performDefaultBack()
-        }
+        requestLeave(LeaveVia.BACK)
         return true
     }
 
-    private fun maybeShowUnsavedChangesDialog(discard: () -> Unit) {
-        if (System.currentTimeMillis() - mLastSavePromptTS > SAVE_DISCARD_PROMPT_INTERVAL && hasContactChanged()) {
-            mLastSavePromptTS = System.currentTimeMillis()
-            ConfirmationAdvancedDialog(
+    /** Leaving goes through the edit loop: the form is read here, the prompt-or-leave decision is the update's. */
+    private fun requestLeave(via: LeaveVia) {
+        val facts = BackFacts(isSaving, contact, contact?.let { fillContactValues() }, originalRingtone)
+        dispatch(EditContactAction.LeaveRequested(via, facts, System.currentTimeMillis()))
+    }
+
+    // Every edit effect is Ui for now, so they run inline on the main thread, in order.
+    private fun dispatch(action: EditContactAction) {
+        val next = update(editState, action)
+        editState = next.state
+        next.effects.forEach { runEffect(it) }
+    }
+
+    private fun runEffect(effect: EditContactEffect) {
+        when (effect) {
+            is EditContactEffect.AskToSave -> ConfirmationAdvancedDialog(
                 activity = this,
                 message = "",
                 messageId = org.fossify.commons.R.string.save_before_closing,
                 positive = org.fossify.commons.R.string.save,
                 negative = org.fossify.commons.R.string.discard
-            ) {
-                if (it) {
-                    saveContact()
-                } else {
-                    discard()
-                }
+            ) { dispatch(EditContactAction.PromptAnswered(effect.via, it)) }
+
+            is EditContactEffect.Exit -> leave(effect.via)
+            EditContactEffect.Save -> saveContact()
+        }
+    }
+
+    private fun leave(via: LeaveVia) {
+        when (via) {
+            LeaveVia.BACK -> performDefaultBack()
+            LeaveVia.TOOLBAR -> {
+                hideKeyboard()
+                finish()
             }
-        } else {
-            discard()
         }
     }
 
@@ -460,16 +479,8 @@ class EditContactActivity : ContactActivity() {
             }
         }
 
-        binding.contactToolbar.setNavigationOnClickListener {
-            if (isSaving) return@setNavigationOnClickListener
-            maybeShowUnsavedChangesDialog {
-                hideKeyboard()
-                finish()
-            }
-        }
+        binding.contactToolbar.setNavigationOnClickListener { requestLeave(LeaveVia.TOOLBAR) }
     }
-
-    private fun hasContactChanged() = contact != null && contact != fillContactValues() || originalRingtone != contact?.ringtone
 
     private fun openWith() {
         Intent().apply {
