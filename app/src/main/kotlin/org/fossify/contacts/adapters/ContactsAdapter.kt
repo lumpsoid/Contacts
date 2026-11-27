@@ -43,9 +43,11 @@ import org.fossify.contacts.dialogs.CreateNewGroupDialog
 import org.fossify.contacts.extensions.config
 import org.fossify.contacts.extensions.editContact
 import org.fossify.contacts.extensions.shareContacts
+import org.fossify.contacts.extensions.transferContacts
 import org.fossify.contacts.helpers.*
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import org.fossify.contacts.interfaces.RemoveFromGroupListener
+import org.fossify.contacts.models.TransferMode
 import java.util.Collections
 import androidx.core.graphics.drawable.toDrawable
 
@@ -108,6 +110,8 @@ class ContactsAdapter(
             findItem(R.id.cab_create_shortcut).isVisible =
                 isOreoPlus() && isOneItemSelected() && (location == LOCATION_FAVORITES_TAB || location == LOCATION_CONTACTS_TAB)
             findItem(R.id.cab_link).isVisible = canLinkSelection()
+            findItem(R.id.cab_move_to_account).isVisible = canTransferSelection()
+            findItem(R.id.cab_copy_to_account).isVisible = canTransferSelection()
 
             if (location == LOCATION_GROUP_CONTACTS) {
                 findItem(R.id.cab_remove).title = activity.getString(R.string.remove_from_group)
@@ -118,6 +122,8 @@ class ContactsAdapter(
     private fun canLinkSelection(): Boolean {
         return selectedKeys.size > 1 && (location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB)
     }
+
+    private fun canTransferSelection() = location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB
 
     override fun actionItemPressed(id: Int) {
         if (selectedKeys.isEmpty()) {
@@ -134,6 +140,7 @@ class ContactsAdapter(
             R.id.cab_send_email_to_contacts -> sendEmailToContacts()
             R.id.cab_create_shortcut -> createShortcut()
             R.id.cab_link -> linkContacts()
+            R.id.cab_move_to_account, R.id.cab_copy_to_account -> transferSelected(id)
             R.id.cab_remove -> removeContacts()
             R.id.cab_delete -> askConfirmDelete()
         }
@@ -328,6 +335,14 @@ class ContactsAdapter(
             }
 
             else -> activity.toast(R.string.cannot_link_private_contacts)
+        }
+    }
+
+    private fun transferSelected(id: Int) {
+        val mode = if (id == R.id.cab_move_to_account) TransferMode.MOVE else TransferMode.COPY
+        activity.transferContacts(getSelectedItems(), mode) {
+            refreshListener?.refreshContacts(ALL_TABS_MASK)
+            finishActMode()
         }
     }
 
