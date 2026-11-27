@@ -29,6 +29,7 @@ import org.fossify.contacts.dialogs.ChooseSocialDialog
 import org.fossify.contacts.dialogs.ManageVisibleFieldsDialog
 import org.fossify.contacts.extensions.*
 import org.fossify.contacts.helpers.*
+import org.fossify.contacts.models.TransferMode
 import java.util.Locale
 
 class ViewContactActivity : ContactActivity() {
@@ -119,6 +120,16 @@ class ViewContactActivity : ContactActivity() {
 
             findItem(R.id.unlink).setOnMenuItemClickListener {
                 unlinkContact()
+                true
+            }
+
+            findItem(R.id.move_to_account).setOnMenuItemClickListener {
+                contact?.let { transferContacts(listOf(it), TransferMode.MOVE) { finish() } }
+                true
+            }
+
+            findItem(R.id.copy_to_account).setOnMenuItemClickListener {
+                contact?.let { transferContacts(listOf(it), TransferMode.COPY) {} }
                 true
             }
 
