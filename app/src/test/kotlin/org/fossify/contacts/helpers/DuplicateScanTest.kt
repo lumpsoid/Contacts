@@ -1,5 +1,6 @@
 package org.fossify.contacts.helpers
 
+import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.Email
@@ -205,5 +206,97 @@ class DuplicateScanTest {
             VISIBLE
         )
         assertTrue(result.duplicates.isEmpty())
+    }
+
+    @Test
+    fun aSharedContactIdIsOnePersonAcrossDeviceRecords() {
+        val people = peopleOf(listOf(record(1, 7), record(2, 7)))
+        assertEquals(listOf("contact:7"), people.map { it.key })
+        assertEquals(listOf(1, 2), people.single().records.map { it.contact.id })
+    }
+
+    @Test
+    fun aDeviceRecordWithoutContactIdAndAPrivateRecordAreTwoPeople() {
+        val people = peopleOf(listOf(record(1, 0), record(2, 2, source = SMT_PRIVATE)))
+        assertEquals(listOf("raw:$GOOGLE:1", "raw:$SMT_PRIVATE:2"), people.map { it.key })
+    }
+
+    @Test
+    fun privateRecordsSharingAContactIdAreSeparatePeople() {
+        val people = peopleOf(listOf(record(1, 7, source = SMT_PRIVATE), record(2, 7, source = SMT_PRIVATE)))
+        assertEquals(listOf("raw:$SMT_PRIVATE:1", "raw:$SMT_PRIVATE:2"), people.map { it.key })
+    }
+
+    @Test
+    fun aPersonInOneAccountIsNotASplitDetail() {
+        val split = scanDuplicates(
+            listOf(record(1, 7, numbers = listOf("111")), record(2, 7, numbers = listOf("222"))),
+            emptySet(),
+            VISIBLE
+        )
+        assertTrue(split.splitDetails.isEmpty())
+    }
+
+    @Test
+    fun aPersonWithoutAWritableRecordIsNotASplitDetail() {
+        val readOnly = scanDuplicates(
+            listOf(
+                record(1, 7, numbers = listOf("111"), access = AccountAccess.READ_ONLY),
+                record(2, 7, source = WHATSAPP, access = AccountAccess.READ_ONLY, numbers = listOf("222"))
+            ),
+            emptySet(),
+            VISIBLE
+        )
+        assertTrue(readOnly.splitDetails.isEmpty())
+
+        // Positive control: a writable first record makes the same person a split detail.
+        val writable = scanDuplicates(
+            listOf(
+                record(1, 7, numbers = listOf("111")),
+                record(2, 7, source = WHATSAPP, access = AccountAccess.READ_ONLY, numbers = listOf("222"))
+            ),
+            emptySet(),
+            VISIBLE
+        )
+        assertEquals(listOf("contact:7"), writable.splitDetails.map { it.key })
+    }
+
+    @Test
+    fun twoPeopleSharingANumberAndAnEmailAreHigh() {
+        val result = scanDuplicates(
+            listOf(
+                record(1, 1, numbers = listOf("555"), emails = listOf("ann@x.com")),
+                record(2, 2, numbers = listOf("555"), emails = listOf("ann@x.com"))
+            ),
+            emptySet(),
+            VISIBLE
+        )
+        assertEquals(MatchConfidence.HIGH, result.duplicates.single().confidence)
+    }
+
+    @Test
+    fun aKeyHeldTwiceByOnePersonIsNotSharedWithAnother() {
+        val lone = scanDuplicates(
+            listOf(
+                record(1, 1, numbers = listOf("555")),
+                record(2, 1, numbers = listOf("555")),
+                record(3, 2, numbers = listOf("777"))
+            ),
+            emptySet(),
+            VISIBLE
+        )
+        assertEquals(MatchConfidence.LOW, lone.duplicates.single().confidence)
+
+        // Positive control: the other person holding 555 too makes the group HIGH.
+        val shared = scanDuplicates(
+            listOf(
+                record(1, 1, numbers = listOf("555")),
+                record(2, 1, numbers = listOf("555")),
+                record(3, 2, numbers = listOf("555"))
+            ),
+            emptySet(),
+            VISIBLE
+        )
+        assertEquals(MatchConfidence.HIGH, shared.duplicates.single().confidence)
     }
 }

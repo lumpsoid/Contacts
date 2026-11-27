@@ -212,4 +212,15 @@ class NameMergeTest {
         val allVisible = withoutKeptSeparate(a, listOf(b, hidden), pairs, setOf("acc", "hidden"))
         assertEquals(emptyList<Int>(), ids(allVisible))
     }
+
+    @Test
+    fun withoutKeptSeparateMatchesThePairInEitherCallOrder() {
+        val a = device(ID_A, CONTACT_A)
+        val b = device(ID_B, CONTACT_B)
+        val pairs = setOf(keptSeparatePair(ID_A, ID_B))
+        assertEquals(emptyList<Int>(), ids(withoutKeptSeparate(b, listOf(a), pairs, VISIBLE)))
+
+        // Positive control: without the pair, the same duplicate is kept.
+        assertEquals(listOf(ID_A), ids(withoutKeptSeparate(b, listOf(a), emptySet(), VISIBLE)))
+    }
 }
