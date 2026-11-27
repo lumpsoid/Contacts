@@ -64,13 +64,13 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         val before = context.newestRecordId(destination)
         if (!ContactsHelper(context).insertContact(merged)) {
             // Commons can fail after its batch already created the raw contact; remove it when it is the only new one.
-            val created = recordIdsAfter(before, destination)
+            val created = context.recordIdsAfter(before, destination)
             if (created.size == 1) {
                 ContactsHelper(context).deleteContacts(arrayListOf(merged.copy(id = created.first())))
             }
             return null
         }
-        return recordIdsAfter(before, destination)
+        return context.recordIdsAfter(before, destination)
     }
 
     override fun readBack(id: Int, destination: ContactSource): Contact? {
@@ -124,36 +124,6 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
             context.showErrorToast(e)
         }
     }
-
-    /** Raw ids above [after] in [destination], ascending. */
-    private fun recordIdsAfter(after: Int, destination: ContactSource): List<Int> {
-        if (destination.type == SMT_PRIVATE) {
-            val db = ContactsDatabase.getInstance(context.applicationContext).openHelper.readableDatabase
-            val ids = ArrayList<Int>()
-            db.query("SELECT id FROM contacts WHERE id > ? ORDER BY id", arrayOf(after)).use {
-                while (it.moveToNext()) {
-                    ids.add(it.getInt(ID_COLUMN))
-                }
-            }
-            return ids
-        }
-        var ids: List<Int> = emptyList()
-        val projection = arrayOf(RawContacts._ID, RawContacts.ACCOUNT_NAME, RawContacts.ACCOUNT_TYPE)
-        val selection = "${RawContacts.DELETED} = 0 AND ${RawContacts._ID} > ?"
-        val sortOrder = "${RawContacts._ID} ASC"
-        try {
-            context.contentResolver.query(
-                RawContacts.CONTENT_URI, projection, selection, arrayOf(after.toString()), sortOrder
-            )?.use {
-                ids = ownIds(it, destination)
-            }
-        } catch (e: SecurityException) {
-            context.showErrorToast(e)
-        } catch (e: IllegalArgumentException) {
-            context.showErrorToast(e)
-        }
-        return ids
-    }
 }
 
 /** Highest raw id in [destination]'s store; every record inserted later is above it. */
@@ -177,6 +147,36 @@ private fun Context.newestRecordId(destination: ContactSource): Int {
         showErrorToast(e)
         0
     }
+}
+
+/** Raw ids above [after] in [destination], ascending. */
+private fun Context.recordIdsAfter(after: Int, destination: ContactSource): List<Int> {
+    if (destination.type == SMT_PRIVATE) {
+        val db = ContactsDatabase.getInstance(applicationContext).openHelper.readableDatabase
+        val ids = ArrayList<Int>()
+        db.query("SELECT id FROM contacts WHERE id > ? ORDER BY id", arrayOf(after)).use {
+            while (it.moveToNext()) {
+                ids.add(it.getInt(ID_COLUMN))
+            }
+        }
+        return ids
+    }
+    var ids: List<Int> = emptyList()
+    val projection = arrayOf(RawContacts._ID, RawContacts.ACCOUNT_NAME, RawContacts.ACCOUNT_TYPE)
+    val selection = "${RawContacts.DELETED} = 0 AND ${RawContacts._ID} > ?"
+    val sortOrder = "${RawContacts._ID} ASC"
+    try {
+        contentResolver.query(
+            RawContacts.CONTENT_URI, projection, selection, arrayOf(after.toString()), sortOrder
+        )?.use {
+            ids = ownIds(it, destination)
+        }
+    } catch (e: SecurityException) {
+        showErrorToast(e)
+    } catch (e: IllegalArgumentException) {
+        showErrorToast(e)
+    }
+    return ids
 }
 
 /** The ids of the rows of [cursor] in the [destination] account, in cursor order. */
