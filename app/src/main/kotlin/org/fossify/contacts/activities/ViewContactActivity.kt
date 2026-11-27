@@ -38,7 +38,9 @@ import org.fossify.contacts.screens.viewcontact.ViewContactNotice
 import org.fossify.contacts.screens.viewcontact.ViewContactState
 import org.fossify.contacts.screens.viewcontact.update
 import java.util.Locale
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class ViewContactActivity : ContactActivity() {
     private var duplicateContacts = ArrayList<Contact>()
@@ -46,12 +48,17 @@ class ViewContactActivity : ContactActivity() {
     private var showFields = 0
     private var duplicateInitialized = false
     private var state = ViewContactState()
-    private val effectRunner = Executors.newSingleThreadExecutor()
+    // One worker and a FIFO queue keep effects in order; the idle thread times out, so the executor is never shut
+    // down and a chain still in flight (delete, then delete the linked raws) completes after onDestroy.
+    private val effectRunner = ThreadPoolExecutor(
+        1, 1, EFFECT_THREAD_IDLE_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue()
+    ).apply { allowCoreThreadTimeOut(true) }
     private val mergeDuplicate: Boolean get() = config.mergeDuplicateContacts
     private val binding by viewBinding(ActivityViewContactBinding::inflate)
 
     companion object {
         private const val COMPARABLE_PHONE_NUMBER_LENGTH = 9
+        private const val EFFECT_THREAD_IDLE_SECONDS = 30L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,11 +78,6 @@ class ViewContactActivity : ContactActivity() {
     override fun onResume() {
         super.onResume()
         dispatch(ViewContactAction.Resumed(intentFacts()))
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        effectRunner.shutdown()
     }
 
     private fun intentFacts(): IntentFacts {
@@ -255,7 +257,7 @@ class ViewContactActivity : ContactActivity() {
         state = next.state
         contact = state.contact
         renderMenu()
-        if (next.effects.isNotEmpty() && !effectRunner.isShutdown) {
+        if (next.effects.isNotEmpty()) {
             effectRunner.execute { next.effects.forEach { runEffect(it) } }
         }
     }
