@@ -433,4 +433,30 @@ class VcardToContactTest {
         ).contact.events
         assertEquals(listOf(Event("circa 1800", CommonDataKinds.Event.TYPE_BIRTHDAY)), events)
     }
+
+    @Test
+    fun birthdayWithoutYearKeepsItsMonthAndDay() {
+        val events = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            BDAY:--05-01
+            END:VCARD
+            """
+        ).contact.events
+        assertEquals(listOf(Event("--05-01", CommonDataKinds.Event.TYPE_BIRTHDAY)), events)
+    }
+
+    @Test
+    fun unparseableEventTypeFallsBackToOther() {
+        val events = parse(
+            """
+            BEGIN:VCARD
+            VERSION:4.0
+            X-FOSSIFY-EVENT;X-TYPE=junk:2001-05-06
+            END:VCARD
+            """
+        ).contact.events
+        assertEquals(listOf(Event("2001-05-06", CommonDataKinds.Event.TYPE_OTHER)), events)
+    }
 }

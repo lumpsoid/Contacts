@@ -37,6 +37,16 @@ class TrustedCallersTest {
     }
 
     @Test
+    fun aCallerDigestInUpperCaseMatchesAnOwnLowerCaseOne() {
+        assertTrue(isTrustedCaller(listOf("AB12"), listOf("ab12")))
+    }
+
+    @Test
+    fun noCertsOnEitherSideIsRejected() {
+        assertFalse(isTrustedCaller(emptyList(), emptyList()))
+    }
+
+    @Test
     fun sha256HexMatchesTheStandardVector() {
         val expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         assertEquals(expected, sha256Hex("abc".toByteArray()))

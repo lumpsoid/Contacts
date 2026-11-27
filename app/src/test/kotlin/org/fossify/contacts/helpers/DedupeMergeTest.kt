@@ -1,9 +1,12 @@
 package org.fossify.contacts.helpers
 
+import android.provider.ContactsContract.CommonDataKinds.Event.TYPE_ANNIVERSARY
 import android.provider.ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.contacts.Contact
+import org.fossify.commons.models.contacts.Email
 import org.fossify.commons.models.contacts.Event
+import org.fossify.commons.models.contacts.Group
 import org.fossify.contacts.models.AccountAccess
 import org.fossify.contacts.models.ConflictField
 import org.fossify.contacts.models.ExtraDetails
@@ -221,5 +224,104 @@ class DedupeMergeTest {
         val known = extrasRecord(1, "Ann", ExtraDetails())
         val unknown = extrasRecord(2, "Ann", null)
         assertNull(buildMergedExtras(listOf(known, unknown), MergeChoices()))
+    }
+
+    @Test
+    fun defaultBirthdayFallsBackToAReadOnlyRecord() {
+        val writable = record(1, "Ann")
+        val birthday = listOf(Event("1990-01-01", TYPE_BIRTHDAY))
+        val readOnly = record(2, "Ann", access = AccountAccess.READ_ONLY, events = birthday)
+        val holder = defaultHolder(ConflictField.BIRTHDAY, listOf(writable, readOnly))
+        assertEquals(readOnly.key, holder?.key)
+    }
+
+    @Test
+    fun defaultNameIsNullWhenOnlyAReadOnlyRecordHasOne() {
+        val blank = record(1, "")
+        val readOnly = record(2, "Anna W", access = AccountAccess.READ_ONLY)
+        assertNull(defaultHolder(ConflictField.NAME, listOf(blank, readOnly)))
+    }
+
+    @Test
+    fun aPickOfARecordNotInTheListGivesTheDefaultHolder() {
+        val writable = record(1, "Ann")
+        val readOnly = record(2, "Anna W", access = AccountAccess.READ_ONLY)
+        val records = listOf(writable, readOnly)
+        val choices = MergeChoices().pick(ConflictField.NAME, "gone:9")
+        val expected = defaultHolder(ConflictField.NAME, records)
+        assertEquals(writable.key, expected?.key)
+        assertEquals(expected?.key, holderOf(ConflictField.NAME, records, choices)?.key)
+    }
+
+    @Test
+    fun notesThatDifferOnlyAroundTheEdgesAreNoConflict() {
+        val conflicts = findConflicts(listOf(record(1, "Ann", notes = " x "), record(2, "Ann", notes = "x")))
+        assertFalse(conflicts.containsKey(ConflictField.NOTES))
+    }
+
+    @Test
+    fun differentNotesAreAConflict() {
+        val conflicts = findConflicts(listOf(record(1, "Ann", notes = "x"), record(2, "Ann", notes = "y")))
+        assertEquals(2, conflicts.getValue(ConflictField.NOTES).size)
+    }
+
+    private fun recordOf(contact: Contact) = MergeRecord(contact, "com.google", AccountAccess.WRITABLE)
+
+    @Test
+    fun mergedEmailsKeepOneOfAnAddressWrittenTwice() {
+        val first = recordOf(
+            Contact(id = 1, contactId = 1, source = "acc", emails = arrayListOf(Email(" A@x.com ", 0, "")))
+        )
+        val second = recordOf(
+            Contact(id = 2, contactId = 2, source = "acc", emails = arrayListOf(Email("a@x.com", 0, "")))
+        )
+        val merged = buildMergedContact(first.contact, listOf(first, second), MergeChoices())
+        assertEquals(1, merged.emails.size)
+    }
+
+    @Test
+    fun mergedContactIsStarredWhenAnyRecordIsStarred() {
+        val unstarred = recordOf(Contact(id = 1, contactId = 1, source = "acc", starred = 0))
+        val starred = recordOf(Contact(id = 2, contactId = 2, source = "acc", starred = 1))
+        val merged = buildMergedContact(unstarred.contact, listOf(unstarred, starred), MergeChoices())
+        assertEquals(1, merged.starred)
+    }
+
+    @Test
+    fun mergedRingtoneIsTheFirstNonBlankOne() {
+        val blank = recordOf(Contact(id = 1, contactId = 1, source = "acc", ringtone = ""))
+        val set = recordOf(Contact(id = 2, contactId = 2, source = "acc", ringtone = "r1"))
+        val merged = buildMergedContact(blank.contact, listOf(blank, set), MergeChoices())
+        assertEquals("r1", merged.ringtone)
+    }
+
+    @Test
+    fun mergedRingtoneFallsBackToTheBaseWhenAllAreBlank() {
+        val base = Contact(id = 9, contactId = 9, source = "acc", ringtone = "base.ogg")
+        val first = recordOf(Contact(id = 1, contactId = 1, source = "acc", ringtone = ""))
+        val second = recordOf(Contact(id = 2, contactId = 2, source = "acc", ringtone = " "))
+        val merged = buildMergedContact(base, listOf(first, second), MergeChoices())
+        assertEquals("base.ogg", merged.ringtone)
+    }
+
+    @Test
+    fun mergedGroupsHaveOneEntryPerTitle() {
+        val first = recordOf(
+            Contact(id = 1, contactId = 1, source = "acc", groups = arrayListOf(Group(1L, "F")))
+        )
+        val second = recordOf(
+            Contact(id = 2, contactId = 2, source = "acc", groups = arrayListOf(Group(2L, "F")))
+        )
+        val merged = buildMergedContact(first.contact, listOf(first, second), MergeChoices())
+        assertEquals(listOf("F"), merged.groups.map { it.title })
+    }
+
+    @Test
+    fun mergedBirthdayIsTheDefaultHoldersAndEveryOtherEventComesOnce() {
+        val anniversary = Event("2001-05-06", TYPE_ANNIVERSARY)
+        val first = record(1, "Ann", events = listOf(Event("1990-01-01", TYPE_BIRTHDAY), anniversary))
+        val second = record(2, "Ann", events = listOf(Event("1991-02-02", TYPE_BIRTHDAY), anniversary))
+        val merged = buildMergedContact(first.contact, listOf(first, second), MergeChoices())
+        assertEquals(listOf(anniversary, Event("1990-01-01", TYPE_BIRTHDAY)), merged.events)
     }
 }

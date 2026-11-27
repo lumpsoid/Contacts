@@ -84,4 +84,50 @@ class DedupeSelectionTest {
         assertEquals(listOf(high.key, low.key, split.key), expected.map { it.first })
         assertEquals(expected, summaryOf(restored.plans()))
     }
+
+    private fun line(vararg parts: String) = parts.joinToString("\u001F")
+
+    @Test
+    fun aLineWithAnUnknownConflictFieldPicksNothing() {
+        val selection = DedupeSelection(result)
+        selection.restoreState(listOf(line("C", high.key, "NOT_A_FIELD", "acc:1")))
+        assertEquals(MergeChoices(), selection.choicesOf(high.key))
+
+        // Positive control: a known field is picked.
+        selection.restoreState(listOf(line("C", high.key, ConflictField.NAME.name, "acc:1")))
+        assertEquals("acc:1", selection.choicesOf(high.key).picks[ConflictField.NAME])
+    }
+
+    @Test
+    fun aLineWithAnUnknownTagIsIgnored() {
+        val selection = DedupeSelection(result)
+        selection.restoreState(listOf(line("Z", high.key), line("Z", split.key, "acc:1")))
+        assertTrue(selection.plans().isEmpty())
+
+        // Positive control: a known tag selects the group.
+        selection.restoreState(listOf(line("S", high.key)))
+        assertEquals(listOf(high.key), keysOf(selection))
+    }
+
+    @Test
+    fun aSinglePartLineIsIgnoredWithoutCrashing() {
+        val selection = DedupeSelection(result)
+        selection.restoreState(listOf("S", ""))
+        assertTrue(selection.plans().isEmpty())
+
+        // Positive control: the same tag with its key selects the group.
+        selection.restoreState(listOf(line("S", high.key)))
+        assertEquals(listOf(high.key), keysOf(selection))
+    }
+
+    @Test
+    fun restoringReplacesTheSelectionItFollows() {
+        val selection = DedupeSelection(result)
+        selection.setIncluded(high.key, "contact:2", false)
+        selection.setChoices(high.key, MergeChoices().pick(ConflictField.NAME, "acc:3"))
+        selection.restoreState(listOf(line("S", low.key)))
+        assertEquals(listOf(low.key), keysOf(selection))
+        assertTrue(selection.isIncluded(high.key, "contact:2"))
+        assertEquals(MergeChoices(), selection.choicesOf(high.key))
+    }
 }
