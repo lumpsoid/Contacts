@@ -9,14 +9,12 @@ import org.fossify.commons.helpers.ContactsHelper
 import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
+import org.fossify.contacts.models.GroupRow
 
 private const val ID_COLUMN = 0
 private const val TITLE_COLUMN = 1
 private const val ACCOUNT_NAME_COLUMN = 2
 private const val ACCOUNT_TYPE_COLUMN = 3
-
-/** One group row of the device, as read from the cursor. */
-data class GroupRow(val id: Long, val title: String?, val accountName: String?, val accountType: String?)
 
 /** The groups of [destination] in [rows] by title, keeping the first of each title. */
 fun groupsByTitle(rows: List<GroupRow>, destination: ContactSource): Map<String, Group> {

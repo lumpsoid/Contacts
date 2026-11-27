@@ -16,6 +16,7 @@ import org.fossify.commons.models.contacts.Group
 import org.fossify.contacts.extensions.getCachePhotoUri
 import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeRecord
+import org.fossify.contacts.models.RawAccountRow
 import java.io.FileOutputStream
 import java.io.IOException
 
@@ -187,9 +188,6 @@ private fun Context.recordIdsAfter(after: Int, destination: ContactSource): List
     }
     return ids
 }
-
-/** A raw contact row read from the provider: its id and the account it belongs to. */
-data class RawAccountRow(val id: Int, val accountName: String, val accountType: String)
 
 /** The ids of the rows in the [destination] account, in row order. */
 internal fun ownIds(rows: List<RawAccountRow>, destination: ContactSource): List<Int> {

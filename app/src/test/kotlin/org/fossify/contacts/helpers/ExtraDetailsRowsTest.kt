@@ -3,6 +3,7 @@ package org.fossify.contacts.helpers
 import android.provider.ContactsContract.CommonDataKinds.Relation
 import android.provider.ContactsContract.CommonDataKinds.SipAddress
 import android.provider.ContactsContract.CommonDataKinds.StructuredName
+import org.fossify.contacts.models.ExtraDetailRow
 import org.fossify.contacts.models.LabeledValue
 import org.fossify.contacts.models.PhoneticName
 import org.junit.Assert.assertEquals

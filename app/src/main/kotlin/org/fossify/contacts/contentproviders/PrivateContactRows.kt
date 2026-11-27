@@ -3,8 +3,7 @@ package org.fossify.contacts.contentproviders
 import com.google.gson.Gson
 import org.fossify.commons.helpers.MyContactsContentProvider
 import org.fossify.commons.models.SimpleContact
-
-data class PrivateContactsQuery(val favoritesOnly: Boolean, val withPhoneNumbersOnly: Boolean)
+import org.fossify.contacts.models.PrivateContactsQuery
 
 fun privateContactsQueryOf(selectionArgs: Array<out String>?) = PrivateContactsQuery(
     favoritesOnly = selectionArgs?.getOrNull(0)?.equals("1") ?: false,

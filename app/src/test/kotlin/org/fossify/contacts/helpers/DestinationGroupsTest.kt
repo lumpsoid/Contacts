@@ -2,6 +2,7 @@ package org.fossify.contacts.helpers
 
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
+import org.fossify.contacts.models.GroupRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

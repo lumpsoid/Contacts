@@ -15,6 +15,7 @@ import android.provider.ContactsContract.Data
 import org.fossify.commons.extensions.getIntValue
 import org.fossify.commons.extensions.getStringValue
 import org.fossify.commons.extensions.showErrorToast
+import org.fossify.contacts.models.ExtraDetailRow
 import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.LabeledValue
 import org.fossify.contacts.models.PhoneticName
@@ -154,18 +155,6 @@ class ExtraDetailsStore(private val context: Context) {
         return context.contentResolver.insert(Data.CONTENT_URI, values) != null
     }
 }
-
-/** The cursor values of one row of the [ExtraDetailsStore] query, as plain values. */
-data class ExtraDetailRow(
-    val rawId: Int,
-    val mimetype: String?,
-    val data1: String?,
-    val data2: Int,
-    val data3: String?,
-    val phoneticGiven: String?,
-    val phoneticMiddle: String?,
-    val phoneticFamily: String?
-)
 
 /** The [ExtraDetails] of each raw contact in [rows] that has any, by raw id. */
 fun extraDetailsOf(rows: List<ExtraDetailRow>): Map<Int, ExtraDetails> {

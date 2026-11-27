@@ -1,6 +1,7 @@
 package org.fossify.contacts.contentproviders
 
 import org.fossify.commons.models.SimpleContact
+import org.fossify.contacts.models.PrivateContactsQuery
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

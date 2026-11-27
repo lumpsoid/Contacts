@@ -1,6 +1,7 @@
 package org.fossify.contacts.helpers
 
 import org.fossify.commons.models.contacts.ContactSource
+import org.fossify.contacts.models.RawAccountRow
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
