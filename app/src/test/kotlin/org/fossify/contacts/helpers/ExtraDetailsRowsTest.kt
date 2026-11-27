@@ -60,6 +60,14 @@ class ExtraDetailsRowsTest {
     }
 
     @Test
+    fun allThreePhoneticPartsAreKept() {
+        val result = extraDetailsOf(
+            listOf(row(1, StructuredName.CONTENT_ITEM_TYPE, given = "G", middle = "M", family = "F"))
+        )
+        assertEquals(PhoneticName("G", "M", "F"), result.getValue(1).phoneticName)
+    }
+
+    @Test
     fun otherMimetypesAreIgnored() {
         val result = extraDetailsOf(
             listOf(row(1, "vnd.android.cursor.item/email_v2", data1 = "x"))

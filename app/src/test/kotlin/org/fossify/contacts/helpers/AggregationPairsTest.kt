@@ -26,4 +26,14 @@ class AggregationPairsTest {
         // Id 2 is in both lists, so the pair 2 with 2 is not made.
         assertEquals(listOf(1 to 2, 1 to 3, 2 to 3), keepApartPairs(listOf(1, 2), listOf(2, 3)))
     }
+
+    @Test
+    fun unlinkingIgnoresRepeatedIds() {
+        assertEquals(listOf(1 to 2), unlinkPairs(listOf(1, 2, 1)))
+    }
+
+    @Test
+    fun keepingApartIgnoresRepeatedIds() {
+        assertEquals(listOf(1 to 2), keepApartPairs(listOf(1, 1), listOf(2, 2)))
+    }
 }
