@@ -24,6 +24,7 @@ import org.fossify.commons.models.contacts.Event
 import org.fossify.commons.models.contacts.Group
 import org.fossify.commons.models.contacts.IM
 import org.fossify.commons.models.contacts.Organization
+import org.fossify.contacts.models.DataRow
 
 /**
  * Loads device raw contacts from all their data rows. Commons ContactsHelper only sees raw contacts
@@ -136,12 +137,12 @@ class RawContactLoader(private val context: Context) {
     }
 
     private fun loadContacts(rawIds: List<Int>): Map<Int, Contact> {
-        val contacts = LinkedHashMap<Int, Contact>()
         if (rawIds.isEmpty()) {
-            return contacts
+            return emptyMap()
         }
 
         val storedGroups = ContactsHelper(context).getStoredGroupsSync()
+        val rows = ArrayList<DataRow>()
         rawIds.chunked(IDS_PER_QUERY).forEach { chunk ->
             val selection = "${Data.RAW_CONTACT_ID} IN (${chunk.joinToString(",") { "?" }})"
             val selectionArgs = chunk.map { it.toString() }.toTypedArray()
@@ -152,11 +153,10 @@ class RawContactLoader(private val context: Context) {
                 selectionArgs,
                 showErrors = true
             ) { cursor ->
-                val rawId = cursor.getIntValue(Data.RAW_CONTACT_ID)
-                val contact = contacts.getOrPut(rawId) { createContact(rawId, cursor) }
-                DATA_READERS[cursor.getStringValue(Data.MIMETYPE)]?.invoke(contact, cursor)
+                rows.add(dataRowOf(cursor))
             }
         }
+        val contacts = contactsOf(rows) { it.normalizePhoneNumber() }
         fillGroups(contacts.values, storedGroups)
         return contacts
     }
@@ -251,7 +251,40 @@ fun namelessDuplicatesOf(contact: Contact, nameless: List<Contact>): List<Contac
     }
 }
 
-private typealias DataReader = (contact: Contact, cursor: Cursor) -> Unit
+/** Builds the contacts of [rows] by raw id, in first-row order; [normalize] fills a missing normalized number. */
+fun contactsOf(rows: List<DataRow>, normalize: (String) -> String): Map<Int, Contact> {
+    val contacts = LinkedHashMap<Int, Contact>()
+    rows.forEach { row ->
+        val contact = contacts.getOrPut(row.rawId) { createContact(row.rawId, row) }
+        DATA_READERS[row.mimetype]?.invoke(contact, row, normalize)
+    }
+    return contacts
+}
+
+private fun dataRowOf(cursor: Cursor) = DataRow(
+    rawId = cursor.getIntValue(Data.RAW_CONTACT_ID),
+    contactId = cursor.getIntValue(Data.CONTACT_ID),
+    mimetype = cursor.getStringValue(Data.MIMETYPE),
+    isPrimary = cursor.getIntValue(Data.IS_PRIMARY),
+    data1 = cursor.getStringValue(Data.DATA1),
+    data2Int = cursor.getIntValue(Data.DATA2),
+    data3 = cursor.getStringValue(Data.DATA3),
+    data4 = cursor.getStringValue(Data.DATA4),
+    data5 = cursor.getStringValue(Data.DATA5),
+    data5Int = cursor.getIntValue(Data.DATA5),
+    data6 = cursor.getStringValue(Data.DATA6),
+    data7 = cursor.getStringValue(Data.DATA7),
+    data8 = cursor.getStringValue(Data.DATA8),
+    data9 = cursor.getStringValue(Data.DATA9),
+    data10 = cursor.getStringValue(Data.DATA10),
+    accountName = cursor.getStringValue(RawContacts.ACCOUNT_NAME),
+    starred = cursor.getIntValue(CommonDataKinds.StructuredName.STARRED),
+    photoUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_URI),
+    photoThumbnailUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_THUMBNAIL_URI),
+    customRingtone = cursor.getStringValue(CommonDataKinds.StructuredName.CUSTOM_RINGTONE)
+)
+
+private typealias DataReader = (contact: Contact, row: DataRow, normalize: (String) -> String) -> Unit
 
 private val DATA_PROJECTION = arrayOf(
     Data.RAW_CONTACT_ID,
@@ -275,91 +308,92 @@ private val DATA_PROJECTION = arrayOf(
     CommonDataKinds.StructuredName.CUSTOM_RINGTONE
 )
 
-private fun createContact(rawId: Int, cursor: Cursor) = Contact(
+private fun createContact(rawId: Int, row: DataRow) = Contact(
     id = rawId,
-    contactId = cursor.getIntValue(Data.CONTACT_ID),
-    source = cursor.getStringValue(RawContacts.ACCOUNT_NAME) ?: "",
-    starred = cursor.getIntValue(CommonDataKinds.StructuredName.STARRED),
-    photoUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_URI) ?: "",
-    thumbnailUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_THUMBNAIL_URI) ?: "",
-    ringtone = cursor.getStringValue(CommonDataKinds.StructuredName.CUSTOM_RINGTONE),
+    contactId = row.contactId,
+    source = row.accountName ?: "",
+    starred = row.starred,
+    photoUri = row.photoUri ?: "",
+    thumbnailUri = row.photoThumbnailUri ?: "",
+    ringtone = row.customRingtone,
     mimetype = CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE
 )
 
+// Column per field: Phone/Email/Postal/Event TYPE = DATA2, LABEL = DATA3, Phone NORMALIZED_NUMBER = DATA4,
+// Postal STREET..COUNTRY = DATA4..DATA10, Im PROTOCOL = DATA5, CUSTOM_PROTOCOL = DATA6, Organization TITLE = DATA4.
 private val DATA_READERS = mapOf<String, DataReader>(
-    CommonDataKinds.Phone.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val number = cursor.getStringValue(CommonDataKinds.Phone.NUMBER)
+    CommonDataKinds.Phone.CONTENT_ITEM_TYPE to { contact, row, normalize ->
+        val number = row.data1
         if (number != null) {
-            val normalized = cursor.getStringValue(CommonDataKinds.Phone.NORMALIZED_NUMBER)
-                ?: number.normalizePhoneNumber()
-            val type = cursor.getIntValue(CommonDataKinds.Phone.TYPE)
-            val label = cursor.getStringValue(CommonDataKinds.Phone.LABEL) ?: ""
-            val isPrimary = cursor.getIntValue(CommonDataKinds.Phone.IS_PRIMARY) != 0
+            val normalized = row.data4 ?: normalize(number)
+            val type = row.data2Int
+            val label = row.data3 ?: ""
+            val isPrimary = row.isPrimary != 0
             contact.phoneNumbers.add(PhoneNumber(number, type, label, normalized, isPrimary))
         }
     },
-    CommonDataKinds.Email.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val email = cursor.getStringValue(CommonDataKinds.Email.DATA)
+    CommonDataKinds.Email.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val email = row.data1
         if (email != null) {
-            val type = cursor.getIntValue(CommonDataKinds.Email.TYPE)
-            val label = cursor.getStringValue(CommonDataKinds.Email.LABEL) ?: ""
+            val type = row.data2Int
+            val label = row.data3 ?: ""
             contact.emails.add(Email(email, type, label))
         }
     },
-    CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val address = cursor.getStringValue(CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS)
+    CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val address = row.data1
         if (address != null) {
             contact.addresses.add(
                 Address(
                     value = address,
-                    type = cursor.getIntValue(CommonDataKinds.StructuredPostal.TYPE),
-                    label = cursor.getStringValue(CommonDataKinds.StructuredPostal.LABEL) ?: "",
-                    country = cursor.getStringValue(CommonDataKinds.StructuredPostal.COUNTRY) ?: "",
-                    region = cursor.getStringValue(CommonDataKinds.StructuredPostal.REGION) ?: "",
-                    city = cursor.getStringValue(CommonDataKinds.StructuredPostal.CITY) ?: "",
-                    postcode = cursor.getStringValue(CommonDataKinds.StructuredPostal.POSTCODE) ?: "",
-                    pobox = cursor.getStringValue(CommonDataKinds.StructuredPostal.POBOX) ?: "",
-                    street = cursor.getStringValue(CommonDataKinds.StructuredPostal.STREET) ?: "",
-                    neighborhood = cursor.getStringValue(CommonDataKinds.StructuredPostal.NEIGHBORHOOD) ?: ""
+                    type = row.data2Int,
+                    label = row.data3 ?: "",
+                    country = row.data10 ?: "",
+                    region = row.data8 ?: "",
+                    city = row.data7 ?: "",
+                    postcode = row.data9 ?: "",
+                    pobox = row.data5 ?: "",
+                    street = row.data4 ?: "",
+                    neighborhood = row.data6 ?: ""
                 )
             )
         }
     },
-    CommonDataKinds.Im.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val im = cursor.getStringValue(CommonDataKinds.Im.DATA)
+    CommonDataKinds.Im.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val im = row.data1
         if (im != null) {
-            val type = cursor.getIntValue(CommonDataKinds.Im.PROTOCOL)
-            val label = cursor.getStringValue(CommonDataKinds.Im.CUSTOM_PROTOCOL) ?: ""
+            val type = row.data5Int
+            val label = row.data6 ?: ""
             contact.IMs.add(IM(im, type, label))
         }
     },
-    CommonDataKinds.Event.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val startDate = cursor.getStringValue(CommonDataKinds.Event.START_DATE)
+    CommonDataKinds.Event.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val startDate = row.data1
         if (startDate != null) {
-            contact.events.add(Event(startDate, cursor.getIntValue(CommonDataKinds.Event.TYPE)))
+            contact.events.add(Event(startDate, row.data2Int))
         }
     },
-    CommonDataKinds.Note.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val note = cursor.getStringValue(CommonDataKinds.Note.NOTE)
+    CommonDataKinds.Note.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val note = row.data1
         if (note != null) {
             contact.notes = note
         }
     },
-    CommonDataKinds.Nickname.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val nickname = cursor.getStringValue(CommonDataKinds.Nickname.NAME)
+    CommonDataKinds.Nickname.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val nickname = row.data1
         if (nickname != null) {
             contact.nickname = nickname
         }
     },
-    CommonDataKinds.Organization.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val company = cursor.getStringValue(CommonDataKinds.Organization.COMPANY) ?: ""
-        val title = cursor.getStringValue(CommonDataKinds.Organization.TITLE) ?: ""
+    CommonDataKinds.Organization.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val company = row.data1 ?: ""
+        val title = row.data4 ?: ""
         if (company.isNotEmpty() || title.isNotEmpty()) {
             contact.organization = Organization(company, title)
         }
     },
-    CommonDataKinds.Website.CONTENT_ITEM_TYPE to { contact, cursor ->
-        val url = cursor.getStringValue(CommonDataKinds.Website.URL)
+    CommonDataKinds.Website.CONTENT_ITEM_TYPE to { contact, row, _ ->
+        val url = row.data1
         if (url != null) {
             contact.websites.add(url)
         }
