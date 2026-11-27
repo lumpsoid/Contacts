@@ -2,8 +2,8 @@ package org.fossify.contacts.models
 
 /** A SIP address or a relation: the value, its ContactsContract type and its custom label. */
 data class LabeledValue(val value: String, val type: Int, val label: String) {
-    /** Two values with the same key are the same detail. */
-    val key: String get() = "$type:${value.trim().lowercase()}"
+    /** Two values with the same type, label and value (trimmed, ignoring case) are the same detail. */
+    val key: String get() = "$type:${label.trim().lowercase()}:${value.trim().lowercase()}"
 }
 
 /** The phonetic name: StructuredName PHONETIC_GIVEN_NAME, PHONETIC_MIDDLE_NAME and PHONETIC_FAMILY_NAME. */

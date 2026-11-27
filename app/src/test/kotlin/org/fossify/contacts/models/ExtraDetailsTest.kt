@@ -48,4 +48,13 @@ class ExtraDetailsTest {
         val other = LabeledValue("bob@sip.example", 1, "")
         assertTrue(own.isHeldBy(ExtraDetails(sipAddresses = listOf(sip, other))))
     }
+
+    @Test
+    fun relationsWithDifferentLabelsAreDifferentDetails() {
+        val own = ExtraDetails(relations = listOf(LabeledValue("Bob", 0, "Boss")))
+        val otherLabel = ExtraDetails(relations = listOf(LabeledValue("bob", 0, "Mentor")))
+        assertFalse(own.isHeldBy(otherLabel))
+        val sameLabel = ExtraDetails(relations = listOf(LabeledValue(" Bob", 0, "boss")))
+        assertTrue(own.isHeldBy(sameLabel))
+    }
 }

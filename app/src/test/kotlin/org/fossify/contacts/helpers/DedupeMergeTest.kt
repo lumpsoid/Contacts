@@ -208,6 +208,15 @@ class DedupeMergeTest {
     }
 
     @Test
+    fun mergedExtrasFillEachPhoneticPartOnItsOwn() {
+        val first = extrasRecord(1, "Anna", ExtraDetails(phoneticName = PhoneticName(family = "Petrova")))
+        val second = extrasRecord(2, "Anne", ExtraDetails(phoneticName = PhoneticName(given = "An")))
+        val choices = MergeChoices().pick(ConflictField.NAME, second.key)
+        val merged = buildMergedExtras(listOf(first, second), choices)
+        assertEquals(PhoneticName("An", "", "Petrova"), merged?.phoneticName)
+    }
+
+    @Test
     fun mergedExtrasAreNullWhenOneRecordsAreUnknown() {
         val known = extrasRecord(1, "Ann", ExtraDetails())
         val unknown = extrasRecord(2, "Ann", null)
