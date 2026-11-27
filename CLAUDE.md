@@ -185,3 +185,4 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
   (`helpers/TabContents.kt`, `helpers/ContactSearch.kt`). The selection
   bar, delete targets and link mode of the shared `ContactsAdapter` are
   pure helpers too (`helpers/ContactSelection.kt`, `ContactSelectionTest`).
+- The edit form is read into a plain `FormSnapshot` (`helpers/EditForm.kt`) on save and back; the blank guard, building the Contact and label text -> type id (`helpers/EditFormTypes.kt`) are pure (`EditFormTest`, `EditFormTypesTest`). The edit screen is not on the loop yet.

@@ -104,7 +104,6 @@ import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.Email
 import org.fossify.commons.models.contacts.Event
 import org.fossify.commons.models.contacts.Group
-import org.fossify.commons.models.contacts.IM
 import org.fossify.commons.models.contacts.Organization
 import org.fossify.commons.views.MyAutoCompleteTextView
 import org.fossify.contacts.R
@@ -127,14 +126,26 @@ import org.fossify.contacts.extensions.getCachePhotoUri
 import org.fossify.contacts.extensions.getContactWithIdOrRaw
 import org.fossify.contacts.extensions.getDuplicatesKeptTogether
 import org.fossify.contacts.extensions.showContactSourcePicker
+import org.fossify.contacts.helpers.ADDRESS_TYPE_LABELS
 import org.fossify.contacts.helpers.ADD_NEW_CONTACT_NUMBER
+import org.fossify.contacts.helpers.AddressRow
+import org.fossify.contacts.helpers.EMAIL_TYPE_LABELS
+import org.fossify.contacts.helpers.EVENT_TYPE_LABELS
+import org.fossify.contacts.helpers.EventRow
+import org.fossify.contacts.helpers.FormSnapshot
+import org.fossify.contacts.helpers.IM_TYPE_LABELS
 import org.fossify.contacts.helpers.IS_FROM_SIMPLE_CONTACTS
 import org.fossify.contacts.helpers.KEY_EMAIL
 import org.fossify.contacts.helpers.KEY_NAME
+import org.fossify.contacts.helpers.NumberRow
+import org.fossify.contacts.helpers.PHONE_TYPE_LABELS
+import org.fossify.contacts.helpers.PlainAddress
 import org.fossify.contacts.helpers.RawContactLoader
+import org.fossify.contacts.helpers.StructuredAddress
+import org.fossify.contacts.helpers.TypeLabels
+import org.fossify.contacts.helpers.TypedRow
 import org.fossify.contacts.helpers.streetForStructuredEdit
-import java.util.LinkedList
-import java.util.Locale
+import org.fossify.contacts.helpers.typeIdOf
 
 class EditContactActivity : ContactActivity() {
     companion object {
@@ -1109,7 +1120,7 @@ class EditContactActivity : ContactActivity() {
             RadioItem(Phone.TYPE_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentNumberTypeId = typeOf(numberTypeField, ::getPhoneNumberTypeId)
+        val currentNumberTypeId = typeOf(numberTypeField, PHONE_TYPE_LABELS, Phone.TYPE_CUSTOM)
         RadioGroupDialog(this, items, currentNumberTypeId) {
             if (it as Int == Phone.TYPE_CUSTOM) {
                 CustomLabelDialog(this) {
@@ -1132,7 +1143,7 @@ class EditContactActivity : ContactActivity() {
             RadioItem(CommonDataKinds.Email.TYPE_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentEmailTypeId = typeOf(emailTypeField, ::getEmailTypeId)
+        val currentEmailTypeId = typeOf(emailTypeField, EMAIL_TYPE_LABELS, CommonDataKinds.Email.TYPE_CUSTOM)
         RadioGroupDialog(this, items, currentEmailTypeId) {
             if (it as Int == CommonDataKinds.Email.TYPE_CUSTOM) {
                 CustomLabelDialog(this) {
@@ -1154,7 +1165,7 @@ class EditContactActivity : ContactActivity() {
             RadioItem(StructuredPostal.TYPE_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentAddressTypeId = typeOf(addressTypeField, ::getAddressTypeId)
+        val currentAddressTypeId = typeOf(addressTypeField, ADDRESS_TYPE_LABELS, StructuredPostal.TYPE_CUSTOM)
         RadioGroupDialog(this, items, currentAddressTypeId) {
             if (it as Int == StructuredPostal.TYPE_CUSTOM) {
                 CustomLabelDialog(this) {
@@ -1181,7 +1192,7 @@ class EditContactActivity : ContactActivity() {
             RadioItem(Im.PROTOCOL_CUSTOM, getString(org.fossify.commons.R.string.custom))
         )
 
-        val currentIMTypeId = typeOf(imTypeField, ::getIMTypeId)
+        val currentIMTypeId = typeOf(imTypeField, IM_TYPE_LABELS, Im.PROTOCOL_CUSTOM)
         RadioGroupDialog(this, items, currentIMTypeId) {
             if (it as Int == Im.PROTOCOL_CUSTOM) {
                 CustomLabelDialog(this) {
@@ -1202,7 +1213,7 @@ class EditContactActivity : ContactActivity() {
             RadioItem(CommonDataKinds.Event.TYPE_OTHER, getString(org.fossify.commons.R.string.other))
         )
 
-        val currentEventTypeId = typeOf(eventTypeField, ::getEventTypeId)
+        val currentEventTypeId = typeOf(eventTypeField, EVENT_TYPE_LABELS, CommonDataKinds.Event.TYPE_OTHER)
         RadioGroupDialog(this, items, currentEventTypeId) {
             eventTypeField.setText(getEventTextId(it as Int))
             eventTypeField.tag = it
@@ -1230,23 +1241,9 @@ class EditContactActivity : ContactActivity() {
             return
         }
 
-        val contactFields = arrayListOf(
-            binding.contactPrefix, binding.contactFirstName, binding.contactMiddleName, binding.contactSurname, binding.contactSuffix, binding.contactNickname,
-            binding.contactNotes, binding.contactOrganizationCompany, binding.contactOrganizationJobPosition
-        )
-
-        if (contactFields.all { it.value.isEmpty() }) {
-            if (currentContactPhotoPath.isEmpty() &&
-                getFilledPhoneNumbers().isEmpty() &&
-                getFilledEmails().isEmpty() &&
-                getFilledAddresses().isEmpty() &&
-                getFilledIMs().isEmpty() &&
-                getFilledEvents().isEmpty() &&
-                getFilledWebsites().isEmpty()
-            ) {
-                toast(R.string.fields_empty)
-                return
-            }
+        if (readForm().isBlank(unknownEventText())) {
+            toast(R.string.fields_empty)
+            return
         }
 
         val contactValues = fillContactValues()
@@ -1273,170 +1270,94 @@ class EditContactActivity : ContactActivity() {
         }
     }
 
-    private fun fillContactValues(): Contact {
-        val filledPhoneNumbers = getFilledPhoneNumbers()
-        val filledEmails = getFilledEmails()
-        val filledAddresses = getFilledAddresses()
-        val filledIMs = getFilledIMs()
-        val filledEvents = getFilledEvents()
-        val filledWebsites = getFilledWebsites()
+    private fun fillContactValues(): Contact = readForm().toContact(
+        contact!!, unknownEventText(), { it.normalizePhoneNumber() }, { a, b -> PhoneNumberUtils.compare(a, b) }
+    )
 
-        val newContact = contact!!.copy(
-            prefix = binding.contactPrefix.value,
-            firstName = binding.contactFirstName.value,
-            middleName = binding.contactMiddleName.value,
-            surname = binding.contactSurname.value,
-            suffix = binding.contactSuffix.value,
-            nickname = binding.contactNickname.value,
-            photoUri = currentContactPhotoPath,
-            phoneNumbers = filledPhoneNumbers,
-            emails = filledEmails,
-            addresses = filledAddresses,
-            IMs = filledIMs,
-            events = filledEvents,
-            starred = if (isContactStarred()) 1 else 0,
-            notes = binding.contactNotes.value,
-            websites = filledWebsites,
+    private fun readForm() = FormSnapshot(
+        prefix = binding.contactPrefix.value, firstName = binding.contactFirstName.value,
+        middleName = binding.contactMiddleName.value, surname = binding.contactSurname.value,
+        suffix = binding.contactSuffix.value, nickname = binding.contactNickname.value,
+        notes = binding.contactNotes.value, company = binding.contactOrganizationCompany.value,
+        jobPosition = binding.contactOrganizationJobPosition.value,
+        photoPath = currentContactPhotoPath, starred = isContactStarred(),
+        numbers = readNumberRows(), emails = readEmailRows(), addresses = readAddressRows(),
+        ims = readImRows(), events = readEventRows(), websites = readWebsites(),
+    )
+
+    private fun unknownEventText() = getString(org.fossify.commons.R.string.unknown)
+
+    private fun readNumberRows(): List<NumberRow> = (0 until binding.contactNumbersHolder.childCount).map { i ->
+        val numberHolder = ItemEditPhoneNumberBinding.bind(binding.contactNumbersHolder.getChildAt(i))
+        NumberRow(
+            number = numberHolder.contactNumber.value,
+            type = typeOf(numberHolder.contactNumberType, PHONE_TYPE_LABELS, Phone.TYPE_CUSTOM),
+            label = numberHolder.contactNumberType.value,
+            // the normalised number the row was loaded with; the save keeps it when the number is unchanged
+            fetchedNormalized = numberHolder.contactNumber.tag?.toString() ?: "",
+            isPrimary = numberHolder.defaultToggleIcon.tag == 1,
         )
-
-        val company = binding.contactOrganizationCompany.value
-        val jobPosition = binding.contactOrganizationJobPosition.value
-        newContact.organization = Organization(company, jobPosition)
-        return newContact
     }
 
-    private fun getFilledPhoneNumbers(): ArrayList<PhoneNumber> {
-        val phoneNumbers = ArrayList<PhoneNumber>()
-        val numbersCount = binding.contactNumbersHolder.childCount
-        for (i in 0 until numbersCount) {
-            val numberHolder = ItemEditPhoneNumberBinding.bind(binding.contactNumbersHolder.getChildAt(i))
-            val number = numberHolder.contactNumber.value
-            val numberType = typeOf(numberHolder.contactNumberType, ::getPhoneNumberTypeId)
-            val numberLabel = if (numberType == Phone.TYPE_CUSTOM) numberHolder.contactNumberType.value else ""
-
-            if (number.isNotEmpty()) {
-                var normalizedNumber = number.normalizePhoneNumber()
-
-                // fix a glitch when onBackPressed the app thinks that a number changed because we fetched
-                // normalized number +421903123456, then at getting it from the input field we get 0903123456, can happen at WhatsApp contacts
-                val fetchedNormalizedNumber = numberHolder.contactNumber.tag?.toString() ?: ""
-                if (PhoneNumberUtils.compare(number.normalizePhoneNumber(), fetchedNormalizedNumber)) {
-                    normalizedNumber = fetchedNormalizedNumber
-                }
-
-                val isPrimary = numberHolder.defaultToggleIcon.tag == 1
-                phoneNumbers.add(PhoneNumber(number, numberType, numberLabel, normalizedNumber, isPrimary))
-            }
-        }
-        return phoneNumbers
+    private fun readEmailRows(): List<TypedRow> = (0 until binding.contactEmailsHolder.childCount).map { i ->
+        val emailHolder = ItemEditEmailBinding.bind(binding.contactEmailsHolder.getChildAt(i))
+        TypedRow(
+            value = emailHolder.contactEmail.value,
+            type = typeOf(emailHolder.contactEmailType, EMAIL_TYPE_LABELS, CommonDataKinds.Email.TYPE_CUSTOM),
+            label = emailHolder.contactEmailType.value,
+        )
     }
 
-    private fun getFilledEmails(): ArrayList<Email> {
-        val emails = ArrayList<Email>()
-        val emailsCount = binding.contactEmailsHolder.childCount
-        for (i in 0 until emailsCount) {
-            val emailHolder = ItemEditEmailBinding.bind(binding.contactEmailsHolder.getChildAt(i))
-            val email = emailHolder.contactEmail.value
-            val emailType = typeOf(emailHolder.contactEmailType, ::getEmailTypeId)
-            val emailLabel = if (emailType == CommonDataKinds.Email.TYPE_CUSTOM) emailHolder.contactEmailType.value else ""
-
-            if (email.isNotEmpty()) {
-                emails.add(Email(email, emailType, emailLabel))
-            }
+    private fun readAddressRows(): List<AddressRow> = (0 until binding.contactAddressesHolder.childCount).map { i ->
+        val addressHolderView = binding.contactAddressesHolder.getChildAt(i)
+        // Don't rely on config.showContactFields since that might just have changed
+        if (addressHolderView.id == R.id.contact_structured_address_holder) {
+            val structuredAddressHolder = ItemEditStructuredAddressBinding.bind(addressHolderView)
+            StructuredAddress(
+                street = structuredAddressHolder.contactStreet.value,
+                neighborhood = structuredAddressHolder.contactNeighborhood.value,
+                city = structuredAddressHolder.contactCity.value,
+                postcode = structuredAddressHolder.contactPostcode.value,
+                pobox = structuredAddressHolder.contactPobox.value,
+                region = structuredAddressHolder.contactRegion.value,
+                country = structuredAddressHolder.contactCountry.value,
+                type = typeOf(
+                    structuredAddressHolder.contactStructuredAddressType,
+                    ADDRESS_TYPE_LABELS,
+                    StructuredPostal.TYPE_CUSTOM,
+                ),
+                label = structuredAddressHolder.contactStructuredAddressType.value,
+            )
+        } else {
+            val addressHolder = ItemEditAddressBinding.bind(addressHolderView)
+            PlainAddress(
+                address = addressHolder.contactAddress.value,
+                type = typeOf(addressHolder.contactAddressType, ADDRESS_TYPE_LABELS, StructuredPostal.TYPE_CUSTOM),
+                label = addressHolder.contactAddressType.value,
+            )
         }
-        return emails
     }
 
-    private fun getFilledAddresses(): ArrayList<Address> {
-        val addresses = ArrayList<Address>()
-        val addressesCount = binding.contactAddressesHolder.childCount
-        for (i in 0 until addressesCount) {
-            val addressHolderView = binding.contactAddressesHolder.getChildAt(i)
-            // Don't rely on config.showContactFields since that might just have changed
-            if (addressHolderView.id == R.id.contact_structured_address_holder) {
-                val structuredAddressHolder = ItemEditStructuredAddressBinding.bind(addressHolderView)
-                val street = structuredAddressHolder.contactStreet.value
-                val neighborhood = structuredAddressHolder.contactNeighborhood.value
-                val city = structuredAddressHolder.contactCity.value
-                val postcode = structuredAddressHolder.contactPostcode.value
-                val pobox = structuredAddressHolder.contactPobox.value
-                val region = structuredAddressHolder.contactRegion.value
-                val country = structuredAddressHolder.contactCountry.value
-
-                /* from DAVdroid */
-                val lineStreet = arrayOf(street, pobox, neighborhood).filter { it.isNotEmpty() }.joinToString(" ")
-                val lineLocality = arrayOf(postcode, city).filter { it.isNotEmpty() }.joinToString(" ")
-                val lines = LinkedList<String>()
-                if (lineStreet.isNotEmpty()) lines += lineStreet
-                if (lineLocality.isNotEmpty()) lines += lineLocality
-                if (region.isNotEmpty()) lines += region
-                if (country.isNotEmpty()) lines += country.uppercase(Locale.getDefault())
-                val address  = lines.joinToString("\n")
-                val addressType = typeOf(structuredAddressHolder.contactStructuredAddressType, ::getAddressTypeId)
-                val addressLabel = if (addressType == StructuredPostal.TYPE_CUSTOM)
-                     structuredAddressHolder.contactStructuredAddressType.value else ""
-
-                if (address.isNotEmpty()) {
-                    addresses.add(Address(address, addressType, addressLabel, country, region, city, postcode, pobox,
-                            street, neighborhood))
-                }
-            } else {
-                val addressHolder = ItemEditAddressBinding.bind(addressHolderView)
-                val address = addressHolder.contactAddress.value
-                val addressType = typeOf(addressHolder.contactAddressType, ::getAddressTypeId)
-                val addressLabel = if (addressType == StructuredPostal.TYPE_CUSTOM) addressHolder.contactAddressType.value else ""
-
-                if (address.isNotEmpty()) {
-                    addresses.add(Address(address, addressType, addressLabel, "", "", "", "", "", "", ""))
-                }
-            }
-        }
-        return addresses
+    private fun readImRows(): List<TypedRow> = (0 until binding.contactImsHolder.childCount).map { i ->
+        val imHolder = ItemEditImBinding.bind(binding.contactImsHolder.getChildAt(i))
+        TypedRow(
+            value = imHolder.contactIm.value,
+            type = typeOf(imHolder.contactImType, IM_TYPE_LABELS, Im.PROTOCOL_CUSTOM),
+            label = imHolder.contactImType.value,
+        )
     }
 
-    private fun getFilledIMs(): ArrayList<IM> {
-        val IMs = ArrayList<IM>()
-        val IMsCount = binding.contactImsHolder.childCount
-        for (i in 0 until IMsCount) {
-            val IMsHolder = ItemEditImBinding.bind(binding.contactImsHolder.getChildAt(i))
-            val IM = IMsHolder.contactIm.value
-            val imType = typeOf(IMsHolder.contactImType, ::getIMTypeId)
-            val imLabel = if (imType == Im.PROTOCOL_CUSTOM) IMsHolder.contactImType.value else ""
-
-            if (IM.isNotEmpty()) {
-                IMs.add(IM(IM, imType, imLabel))
-            }
-        }
-        return IMs
+    private fun readEventRows(): List<EventRow> = (0 until binding.contactEventsHolder.childCount).map { i ->
+        val eventHolder = ItemEventBinding.bind(binding.contactEventsHolder.getChildAt(i))
+        EventRow(
+            shown = eventHolder.contactEvent.value,
+            date = eventHolder.contactEvent.tag?.toString() ?: "",
+            type = typeOf(eventHolder.contactEventType, EVENT_TYPE_LABELS, CommonDataKinds.Event.TYPE_OTHER),
+        )
     }
 
-    private fun getFilledEvents(): ArrayList<Event> {
-        val unknown = getString(org.fossify.commons.R.string.unknown)
-        val events = ArrayList<Event>()
-        val eventsCount = binding.contactEventsHolder.childCount
-        for (i in 0 until eventsCount) {
-            val eventHolder = ItemEventBinding.bind(binding.contactEventsHolder.getChildAt(i))
-            val event = eventHolder.contactEvent.value
-            val eventType = typeOf(eventHolder.contactEventType, ::getEventTypeId)
-
-            if (event.isNotEmpty() && event != unknown) {
-                events.add(Event(eventHolder.contactEvent.tag.toString(), eventType))
-            }
-        }
-        return events
-    }
-
-    private fun getFilledWebsites(): ArrayList<String> {
-        val websites = ArrayList<String>()
-        val websitesCount = binding.contactWebsitesHolder.childCount
-        for (i in 0 until websitesCount) {
-            val websiteHolder = ItemEditWebsiteBinding.bind(binding.contactWebsitesHolder.getChildAt(i))
-            val website = websiteHolder.contactWebsite.value
-            if (website.isNotEmpty()) {
-                websites.add(website)
-            }
-        }
-        return websites
+    private fun readWebsites(): List<String> = (0 until binding.contactWebsitesHolder.childCount).map { i ->
+        ItemEditWebsiteBinding.bind(binding.contactWebsitesHolder.getChildAt(i)).contactWebsite.value
     }
 
     private fun insertNewContact(deleteCurrentContact: Boolean, previous: Contact?) {
@@ -1770,54 +1691,9 @@ class EditContactActivity : ContactActivity() {
         binding.contactRingtone.text = contactRingtone.getTitle(this)
     }
 
-    /** The type id the row's type field holds; [byText] maps its text for a field no picker has set up. */
-    private fun typeOf(typeField: TextView, byText: (String) -> Int): Int =
-        typeField.tag as? Int ?: byText(typeField.value)
-
-    private fun getPhoneNumberTypeId(value: String) = when (value) {
-        getString(org.fossify.commons.R.string.mobile) -> Phone.TYPE_MOBILE
-        getString(org.fossify.commons.R.string.home) -> Phone.TYPE_HOME
-        getString(org.fossify.commons.R.string.work) -> Phone.TYPE_WORK
-        getString(org.fossify.commons.R.string.main_number) -> Phone.TYPE_MAIN
-        getString(org.fossify.commons.R.string.work_fax) -> Phone.TYPE_FAX_WORK
-        getString(org.fossify.commons.R.string.home_fax) -> Phone.TYPE_FAX_HOME
-        getString(org.fossify.commons.R.string.pager) -> Phone.TYPE_PAGER
-        getString(org.fossify.commons.R.string.other) -> Phone.TYPE_OTHER
-        else -> Phone.TYPE_CUSTOM
-    }
-
-    private fun getEmailTypeId(value: String) = when (value) {
-        getString(org.fossify.commons.R.string.home) -> CommonDataKinds.Email.TYPE_HOME
-        getString(org.fossify.commons.R.string.work) -> CommonDataKinds.Email.TYPE_WORK
-        getString(org.fossify.commons.R.string.mobile) -> CommonDataKinds.Email.TYPE_MOBILE
-        getString(org.fossify.commons.R.string.other) -> CommonDataKinds.Email.TYPE_OTHER
-        else -> CommonDataKinds.Email.TYPE_CUSTOM
-    }
-
-    private fun getEventTypeId(value: String) = when (value) {
-        getString(org.fossify.commons.R.string.anniversary) -> CommonDataKinds.Event.TYPE_ANNIVERSARY
-        getString(org.fossify.commons.R.string.birthday) -> CommonDataKinds.Event.TYPE_BIRTHDAY
-        else -> CommonDataKinds.Event.TYPE_OTHER
-    }
-
-    private fun getAddressTypeId(value: String) = when (value) {
-        getString(org.fossify.commons.R.string.home) -> StructuredPostal.TYPE_HOME
-        getString(org.fossify.commons.R.string.work) -> StructuredPostal.TYPE_WORK
-        getString(org.fossify.commons.R.string.other) -> StructuredPostal.TYPE_OTHER
-        else -> StructuredPostal.TYPE_CUSTOM
-    }
-
-    private fun getIMTypeId(value: String) = when (value) {
-        getString(R.string.aim) -> Im.PROTOCOL_AIM
-        getString(R.string.windows_live) -> Im.PROTOCOL_MSN
-        getString(R.string.yahoo) -> Im.PROTOCOL_YAHOO
-        getString(R.string.skype) -> Im.PROTOCOL_SKYPE
-        getString(R.string.qq) -> Im.PROTOCOL_QQ
-        getString(R.string.hangouts) -> Im.PROTOCOL_GOOGLE_TALK
-        getString(R.string.icq) -> Im.PROTOCOL_ICQ
-        getString(R.string.jabber) -> Im.PROTOCOL_JABBER
-        else -> Im.PROTOCOL_CUSTOM
-    }
+    /** The type id the row's type field holds; [labels] and [fallback] map its text when no picker set it. */
+    private fun typeOf(typeField: TextView, labels: TypeLabels, fallback: Int): Int =
+        typeField.tag as? Int ?: typeIdOf(typeField.value, labels, fallback, ::getString)
 
     private fun setupAutoComplete(nameTextViews: List<MyAutoCompleteTextView>) {
         ContactsHelper(this).getContacts { contacts ->
