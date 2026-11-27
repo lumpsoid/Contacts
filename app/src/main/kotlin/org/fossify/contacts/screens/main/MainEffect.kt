@@ -11,4 +11,6 @@ sealed interface MainEffect {
     data object ConsumeIntent : Ui
     data class Notify(val notice: MainNotice) : Ui
     data object RefreshAll : Ui
+    data class FilterPage(val text: String) : Ui
+    data object ClearSearch : Ui
 }

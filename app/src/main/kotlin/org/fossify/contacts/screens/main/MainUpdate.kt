@@ -17,6 +17,7 @@ private const val SCHEME_CONTENT = "content"
 fun update(state: MainState, action: A): MainNext = when (action) {
     is A.Tabs -> onTabs(state, action)
     is A.Import -> onImport(state, action)
+    is A.Search -> onSearch(state, action)
 }
 
 private fun onTabs(state: MainState, action: A.Tabs): MainNext = when (action) {
@@ -24,12 +25,27 @@ private fun onTabs(state: MainState, action: A.Tabs): MainNext = when (action) {
         val page = startPage(action.tabs)
         Next(state.copy(startPage = page), listOf(E.ShowPage(page)))
     }
+    A.PageSelected, A.ListsRefreshed -> Next(state, refilter(state))
 }
 
 private fun onImport(state: MainState, action: A.Import): MainNext = when (action) {
     is A.IntentReceived -> Next(state, importEffects(action.facts))
     is A.ImportFinished -> Next(state, if (action.success) listOf(E.RefreshAll) else emptyList())
 }
+
+private fun onSearch(state: MainState, action: A.Search): MainNext = when (action) {
+    // Focus can re-open an open search; keep its text.
+    A.SearchOpened -> Next(state.copy(searchText = state.searchText ?: ""))
+    // Closing clears the box after the close, so "" arrives closed; it still filters the page, as before.
+    is A.SearchTextChanged -> Next(
+        if (state.searchText == null) state else state.copy(searchText = action.text),
+        listOf(E.FilterPage(action.text)),
+    )
+    A.SearchClosed -> Next(state.copy(searchText = null), listOf(E.ClearSearch))
+}
+
+/** An open search filters the page shown and every refreshed list again. */
+private fun refilter(state: MainState): List<E> = state.searchText?.let { listOf(E.FilterPage(it)) } ?: emptyList()
 
 /**
  * The pager index to open on. TAB_LAST_USED reopens the stored page unchecked; a fixed tab opens at its
