@@ -2,10 +2,17 @@ package org.fossify.contacts.screens.editcontact
 
 import android.provider.ContactsContract.CommonDataKinds
 import org.fossify.commons.models.PhoneNumber
+import org.fossify.commons.models.contacts.Address
 import org.fossify.commons.models.contacts.Contact
+import org.fossify.commons.models.contacts.Email
+import org.fossify.commons.models.contacts.Event
+import org.fossify.commons.models.contacts.IM
 import org.fossify.commons.models.contacts.Organization
+import org.fossify.contacts.helpers.EventRow
 import org.fossify.contacts.helpers.FormSnapshot
 import org.fossify.contacts.helpers.NumberRow
+import org.fossify.contacts.helpers.PlainAddress
+import org.fossify.contacts.helpers.TypedRow
 import org.fossify.contacts.screens.editcontact.EditContactAction as A
 import org.fossify.contacts.screens.editcontact.EditContactEffect as E
 import org.junit.Assert.assertEquals
@@ -16,19 +23,31 @@ class EditContactUpdateTest {
     private val same: (String, String) -> Boolean = { a, b -> a.isNotEmpty() && a.takeLast(9) == b.takeLast(9) }
 
     private val saved = Contact(
-        id = 1, contactId = 1, source = "acc", firstName = "Ann", surname = "Lee", notes = "n",
+        id = 1, contactId = 1, source = "acc", prefix = "Mr", firstName = "Ann", middleName = "M",
+        surname = "Lee", suffix = "Jr", nickname = "A", photoUri = "ph", starred = 1, notes = "n",
         organization = Organization("Co", "Dev"),
         phoneNumbers = arrayListOf(PhoneNumber("0903123456", CommonDataKinds.Phone.TYPE_HOME, "", "+421903123456")),
+        emails = arrayListOf(Email("a@b", CommonDataKinds.Email.TYPE_CUSTOM, "Mine")),
+        addresses = arrayListOf(
+            Address("Somewhere 1", CommonDataKinds.StructuredPostal.TYPE_CUSTOM, "Cabin", "", "", "", "", "", "", ""),
+        ),
+        IMs = arrayListOf(IM("me", CommonDataKinds.Im.PROTOCOL_CUSTOM, "Chat")),
+        events = arrayListOf(Event("--05-01", CommonDataKinds.Event.TYPE_ANNIVERSARY)),
         websites = arrayListOf("x.org"),
         ringtone = "r",
     )
 
     private val sameForm = FormSnapshot(
-        firstName = "Ann", surname = "Lee", notes = "n", company = "Co", jobPosition = "Dev",
+        prefix = "Mr", firstName = "Ann", middleName = "M", surname = "Lee", suffix = "Jr", nickname = "A",
+        notes = "n", company = "Co", jobPosition = "Dev", photoPath = "ph", starred = true,
         numbers = listOf(
             NumberRow("0903123456", CommonDataKinds.Phone.TYPE_HOME, "Home", fetchedNormalized = "+421903123456"),
             NumberRow(),
         ),
+        emails = listOf(TypedRow("a@b", CommonDataKinds.Email.TYPE_CUSTOM, "Mine"), TypedRow()),
+        ims = listOf(TypedRow("me", CommonDataKinds.Im.PROTOCOL_CUSTOM, "Chat")),
+        events = listOf(EventRow(shown = "May 1", date = "--05-01", type = CommonDataKinds.Event.TYPE_ANNIVERSARY)),
+        addresses = listOf(PlainAddress("Somewhere 1", CommonDataKinds.StructuredPostal.TYPE_CUSTOM, "Cabin")),
         websites = listOf("x.org", ""),
     )
 
@@ -72,6 +91,20 @@ class EditContactUpdateTest {
         )
         val form = formOf(sameForm.copy(numbers = numbers))
         assertEquals(listOf(E.AskToSave(LeaveVia.BACK)), leave(facts(form = form)).effects)
+    }
+
+    @Test
+    fun eachRowKindEditPrompts() {
+        listOf(
+            sameForm.copy(emails = listOf(TypedRow("b@c", CommonDataKinds.Email.TYPE_CUSTOM, "Mine"))),
+            sameForm.copy(ims = emptyList()),
+            sameForm.copy(events = emptyList()),
+            sameForm.copy(addresses = emptyList()),
+            sameForm.copy(starred = false),
+            sameForm.copy(notes = "m"),
+            sameForm.copy(company = "Co2"),
+            sameForm.copy(websites = listOf("y.org")),
+        ).forEach { assertEquals(listOf(E.AskToSave(LeaveVia.BACK)), leave(facts(form = formOf(it))).effects) }
     }
 
     @Test
@@ -119,6 +152,12 @@ class EditContactUpdateTest {
         val answered = update(EditContactState(), A.PromptAnswered(LeaveVia.TOOLBAR, save = false))
         assertEquals(listOf(E.Exit(LeaveVia.TOOLBAR)), answered.effects)
         assertEquals(listOf(E.Exit(LeaveVia.TOOLBAR)), leave(facts(), via = LeaveVia.TOOLBAR).effects)
+    }
+
+    @Test
+    fun discardLeavesTheWayItWasAsked() {
+        val answered = update(EditContactState(), A.PromptAnswered(LeaveVia.BACK, save = false))
+        assertEquals(listOf(E.Exit(LeaveVia.BACK)), answered.effects)
     }
 
     @Test
