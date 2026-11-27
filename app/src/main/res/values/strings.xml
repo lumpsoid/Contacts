@@ -153,6 +153,10 @@
     <string name="dedupe_fail_delete">Could not delete the old copies</string>
     <string name="dedupe_fail_link">Could not link to the messenger contacts</string>
     <string name="dedupe_fail_error">An error stopped this merge; check this contact</string>
+    <string name="transfer_move">Move to account</string>
+    <string name="transfer_copy">Copy to account</string>
+    <string name="transfer_moved">Contacts moved: %1$d of %2$d</string>
+    <string name="transfer_copied">Contacts copied: %1$d of %2$d</string>
 
     <!-- FAQ -->
     <string name="faq_1_title">I want to change what fields are visible at contacts. Can I do it?</string>
