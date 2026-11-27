@@ -149,6 +149,7 @@
     <string name="dedupe_open_backup">Open backup</string>
     <string name="dedupe_done">Done</string>
     <string name="dedupe_fail_sim">Too many numbers for the SIM</string>
+    <string name="dedupe_fail_no_room">Has a SIP address, relation or phonetic name this account cannot keep; nothing was deleted</string>
     <string name="dedupe_fail_write">Could not save the merged contact; nothing was deleted</string>
     <string name="dedupe_fail_delete">Could not delete the old copies</string>
     <string name="dedupe_fail_link">Could not link to the messenger contacts</string>

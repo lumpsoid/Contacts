@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
+import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeRecord
 
 /** A [MergeStore] that records each call in order and answers with what the test set up. */
@@ -14,6 +15,8 @@ class FakeMergeStore : MergeStore {
     var newIds: List<Int>? = listOf(NEW_ID)
     var deleteWorks = true
     var linkWorks = true
+    var extrasWork = true
+    var addedExtras: ExtraDetails? = null
     var failUpdateWith: RuntimeException? = null
     val storedById = HashMap<Int, Contact>()
     private var written: Contact? = null
@@ -41,6 +44,12 @@ class FakeMergeStore : MergeStore {
     override fun readBack(id: Int, destination: ContactSource): Contact? {
         calls.add("readBack:$id")
         return storedById[id] ?: written?.copy(id = id)
+    }
+
+    override fun addExtras(rawId: Int, extras: ExtraDetails): Boolean {
+        calls.add("extras:$rawId")
+        addedExtras = extras
+        return extrasWork
     }
 
     override fun delete(contacts: List<Contact>): Boolean {

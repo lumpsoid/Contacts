@@ -4,14 +4,15 @@ import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.contacts.models.AccountAccess
+import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeFailure
 import org.fossify.contacts.models.MergeOutcome
 import org.fossify.contacts.models.MergePlan
 import org.fossify.contacts.models.MergeRecord
 
 /**
- * Merges one plan into the destination: write, verify, then delete the old copies and link the rest.
- * Owns that order; [store] does the reading and writing. Blocking; call off the main thread.
+ * Merges one plan into the destination: write and verify, add the extra details, then delete the old copies and
+ * link the rest. Owns that order; [store] does the reading and writing. Blocking; call off the main thread.
  */
 class DedupeWriter(private val store: MergeStore) {
     /** Writes [plan] into [destination]; a failure leaves the group as far as it got. */
@@ -19,27 +20,38 @@ class DedupeWriter(private val store: MergeStore) {
         val target = pickTarget(plan.records, destination)
         val base = target?.contact ?: Contact(id = 0, contactId = 0, source = destination.name)
         val merged = buildMergedContact(base, plan.records, plan.choices)
+        val extras = buildMergedExtras(plan.records, plan.choices)
         val isPrivate = destination.type == SMT_PRIVATE
+        val holdsExtras = !isPrivate && access != AccountAccess.SIM
         val sendToVoicemail = !isPrivate && store.sendsToVoicemail(deviceRawIds(plan))
         val failure = when {
             !access.fits(merged) -> MergeFailure.SIM_LIMIT
+            extras == null -> MergeFailure.WRITE_FAILED
+            !holdsExtras && losesExtras(plan, target) -> MergeFailure.NO_ROOM
             !placePhoto(merged, isPrivate) -> MergeFailure.WRITE_FAILED
-            else -> writeAndClean(plan, merged, target, destination, isPrivate, sendToVoicemail)
+            else -> {
+                val written = if (holdsExtras) extras else ExtraDetails()
+                writeAndClean(plan, merged, written, target, destination, isPrivate, sendToVoicemail)
+            }
         }
         return if (failure == null) MergeOutcome.Merged(plan.key) else MergeOutcome.Failed(plan.key, failure)
     }
 
-    /** Writes [merged], then deletes the old copies and links the rest; null when all of it succeeded. */
+    /**
+     * Writes [merged] and [extras] onto it, then deletes the old copies and links the rest; null when all of it
+     * succeeded.
+     */
     private fun writeAndClean(
         plan: MergePlan,
         merged: Contact,
+        extras: ExtraDetails,
         target: MergeRecord?,
         destination: ContactSource,
         isPrivate: Boolean,
         sendToVoicemail: Boolean
     ): MergeFailure? {
         merged.groups = store.groupsFor(destination, merged.groups.map { it.title }) ?: return MergeFailure.WRITE_FAILED
-        val resultId = writeVerified(merged, target, destination)
+        val resultId = writeVerified(merged, extras, target, destination)
         return when {
             resultId == null -> MergeFailure.WRITE_FAILED
             !store.delete(recordsToDelete(plan, target).map { it.contact }) -> MergeFailure.DELETE_FAILED
@@ -61,22 +73,37 @@ class DedupeWriter(private val store: MergeStore) {
         return true
     }
 
-    /** Updates [target] or inserts [merged] new, and returns its id only when reading it back verifies. */
-    private fun writeVerified(merged: Contact, target: MergeRecord?, destination: ContactSource): Int? {
-        if (target == null) return insertVerified(merged, destination)
+    /**
+     * Updates [target] or inserts [merged] new, and returns its id only when reading it back verifies and [extras]
+     * landed.
+     */
+    private fun writeVerified(
+        merged: Contact,
+        extras: ExtraDetails,
+        target: MergeRecord?,
+        destination: ContactSource
+    ): Int? {
+        if (target == null) return insertVerified(merged, extras, destination)
         if (!store.update(merged, target)) return null
-        return target.contact.id.takeIf { isStored(merged, it, destination) }
+        return target.contact.id.takeIf { isStored(merged, it, destination) && addExtras(it, extras) }
     }
 
     /**
-     * Inserts [merged] and returns the new record that verifies; deletes a failed insert only when it is unambiguous.
+     * Inserts [merged] and returns the new record that verifies and holds [extras]; deletes a failed insert only when
+     * it is unambiguous.
      */
-    private fun insertVerified(merged: Contact, destination: ContactSource): Int? {
+    private fun insertVerified(merged: Contact, extras: ExtraDetails, destination: ContactSource): Int? {
         val newIds = store.insert(merged, destination) ?: return null
-        val id = newIds.firstOrNull { isStored(merged, it, destination) }
+        val id = newIds.firstOrNull { isStored(merged, it, destination) }?.takeIf { addExtras(it, extras) }
         if (id == null && newIds.size == 1) store.delete(listOf(merged.copy(id = newIds.single())))
         return id
     }
+
+    private fun addExtras(id: Int, extras: ExtraDetails) = extras.isEmpty() || store.addExtras(id, extras)
+
+    /** Whether a record [plan] deletes has extra details. */
+    private fun losesExtras(plan: MergePlan, target: MergeRecord?) =
+        recordsToDelete(plan, target).any { it.extras?.isEmpty() == false }
 
     private fun isStored(merged: Contact, id: Int, destination: ContactSource): Boolean =
         store.readBack(id, destination)?.let { verifyMerged(merged, it) } == true

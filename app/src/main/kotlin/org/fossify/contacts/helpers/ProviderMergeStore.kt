@@ -15,6 +15,7 @@ import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
 import org.fossify.contacts.extensions.getCachePhotoUri
+import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeRecord
 import java.io.FileOutputStream
 import java.io.IOException
@@ -79,6 +80,8 @@ class ProviderMergeStore(private val context: Context) : MergeStore {
         val loader = RawContactLoader(context)
         return loader.getContact(id)?.also { loader.fillName(it) }
     }
+
+    override fun addExtras(rawId: Int, extras: ExtraDetails): Boolean = ExtraDetailsStore(context).add(rawId, extras)
 
     override fun delete(contacts: List<Contact>): Boolean {
         return ContactsHelper(context).deleteContacts(ArrayList(contacts))
