@@ -166,7 +166,6 @@
     <ID>MaxLineLength:ViewPagerAdapter.kt$ViewPagerAdapter$class</ID>
     <ID>NestedBlockDepth:ContactsAdapter.kt$ContactsAdapter$private fun setupView(view: View, contact: Contact, holder: ViewHolder)</ID>
     <ID>NestedBlockDepth:EditContactActivity.kt$EditContactActivity$private fun initContact()</ID>
-    <ID>NestedBlockDepth:MainActivity.kt$MainActivity$private fun getDefaultTab(): Int</ID>
     <ID>NestedBlockDepth:SelectContactsAdapter.kt$SelectContactsAdapter.ViewHolder$fun bindView(contact: Contact): View</ID>
     <ID>NestedBlockDepth:VcfExporter.kt$VcfExporter$fun exportContacts( context: Context, outputStream: OutputStream?, contacts: ArrayList&lt;Contact&gt;, showExportingToast: Boolean, version: VCardVersion = VCardVersion.V4_0, callback: (result: ExportResult) -&gt; Unit, )</ID>
     <ID>NestedBlockDepth:VcfImporter.kt$VcfImporter$fun importContacts(path: String, targetContactSource: String): ImportResult</ID>
