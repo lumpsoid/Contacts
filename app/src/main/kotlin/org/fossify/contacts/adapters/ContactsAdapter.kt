@@ -97,33 +97,25 @@ class ContactsAdapter(
     override fun getActionMenuId() = R.menu.cab
 
     override fun prepareActionMode(menu: Menu) {
+        val actions = cabActions(location, selectedKeys.size, isOreoPlus())
         menu.apply {
-            findItem(R.id.cab_edit).isVisible = isOneItemSelected()
-            findItem(R.id.cab_remove).isVisible = location == LOCATION_FAVORITES_TAB || location == LOCATION_GROUP_CONTACTS
-            findItem(R.id.cab_add_to_favorites).isVisible = location == LOCATION_CONTACTS_TAB || location == LOCATION_GROUP_CONTACTS
-            findItem(R.id.cab_add_to_group).isVisible = location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB
-            findItem(R.id.cab_send_sms_to_contacts).isVisible =
-                location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB || location == LOCATION_GROUP_CONTACTS
-            findItem(R.id.cab_send_email_to_contacts).isVisible =
-                location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB || location == LOCATION_GROUP_CONTACTS
-            findItem(R.id.cab_delete).isVisible = location == LOCATION_CONTACTS_TAB || location == LOCATION_GROUP_CONTACTS
-            findItem(R.id.cab_create_shortcut).isVisible =
-                isOreoPlus() && isOneItemSelected() && (location == LOCATION_FAVORITES_TAB || location == LOCATION_CONTACTS_TAB)
-            findItem(R.id.cab_link).isVisible = canLinkSelection()
-            findItem(R.id.cab_move_to_account).isVisible = canTransferSelection()
-            findItem(R.id.cab_copy_to_account).isVisible = canTransferSelection()
+            findItem(R.id.cab_edit).isVisible = CabAction.EDIT in actions
+            findItem(R.id.cab_remove).isVisible = CabAction.REMOVE in actions
+            findItem(R.id.cab_add_to_favorites).isVisible = CabAction.ADD_TO_FAVORITES in actions
+            findItem(R.id.cab_add_to_group).isVisible = CabAction.ADD_TO_GROUP in actions
+            findItem(R.id.cab_send_sms_to_contacts).isVisible = CabAction.SEND_SMS in actions
+            findItem(R.id.cab_send_email_to_contacts).isVisible = CabAction.SEND_EMAIL in actions
+            findItem(R.id.cab_delete).isVisible = CabAction.DELETE in actions
+            findItem(R.id.cab_create_shortcut).isVisible = CabAction.CREATE_SHORTCUT in actions
+            findItem(R.id.cab_link).isVisible = CabAction.LINK in actions
+            findItem(R.id.cab_move_to_account).isVisible = CabAction.MOVE_TO_ACCOUNT in actions
+            findItem(R.id.cab_copy_to_account).isVisible = CabAction.COPY_TO_ACCOUNT in actions
 
             if (location == LOCATION_GROUP_CONTACTS) {
                 findItem(R.id.cab_remove).title = activity.getString(R.string.remove_from_group)
             }
         }
     }
-
-    private fun canLinkSelection(): Boolean {
-        return selectedKeys.size > 1 && (location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB)
-    }
-
-    private fun canTransferSelection() = location == LOCATION_CONTACTS_TAB || location == LOCATION_FAVORITES_TAB
 
     override fun actionItemPressed(id: Int) {
         if (selectedKeys.isEmpty()) {
@@ -246,16 +238,13 @@ class ContactsAdapter(
                 val keptSeparate = if (config.mergeDuplicateContacts) linkHelper.getKeptSeparatePairs() else emptySet()
                 val visibleSources = activity.getVisibleContactSources()
 
-                val matches = contactsToRemove.flatMap { contactToRemove ->
-                    val sameName = allContacts.filter {
-                        (it.id == contactToRemove.id ||
-                            (config.mergeDuplicateContacts && canHaveDuplicates(contactToRemove))) &&
-                            it.getHashToCompare() == contactToRemove.getHashToCompare()
-                    }
-                    withoutKeptSeparate(contactToRemove, sameName, keptSeparate, visibleSources)
-                }
-                // nameless raw contacts are never in allContacts, so delete the selected ones directly too
-                val toDelete = (contactsToRemove + matches).distinctBy { "${it.isPrivate()}:${it.id}" }
+                val toDelete = deleteTargets(
+                    contactsToRemove,
+                    allContacts,
+                    config.mergeDuplicateContacts,
+                    keptSeparate,
+                    visibleSources
+                )
                 ContactsHelper(activity).deleteContacts(ArrayList(toDelete))
                 linkHelper.deleteRawContacts(linkedRawIds)
 
@@ -301,14 +290,10 @@ class ContactsAdapter(
 
     private fun linkContacts() {
         val selected = getSelectedItems()
-        if (selected.size < 2) {
-            return
-        }
+        when (linkMode(selected)) {
+            LinkMode.NONE -> Unit
 
-        val privateCount = selected.count { it.isPrivate() }
-        val question = activity.getString(R.string.merge_private_contacts_confirmation)
-        when (privateCount) {
-            0 -> ensureBackgroundThread {
+            LinkMode.RAW -> ensureBackgroundThread {
                 val linked = ContactLinkHelper(activity).linkRawContacts(selected.map { it.id })
                 activity.runOnUiThread {
                     if (linked) {
@@ -319,22 +304,25 @@ class ContactsAdapter(
                 }
             }
 
-            selected.size -> ConfirmationDialog(activity, question) {
-                ensureBackgroundThread {
-                    val merged = PrivateContactMerger(activity).merge(selected)
-                    activity.runOnUiThread {
-                        if (merged) {
-                            activity.toast(R.string.contacts_merged)
-                        } else {
-                            activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+            LinkMode.PRIVATE -> {
+                val question = activity.getString(R.string.merge_private_contacts_confirmation)
+                ConfirmationDialog(activity, question) {
+                    ensureBackgroundThread {
+                        val merged = PrivateContactMerger(activity).merge(selected)
+                        activity.runOnUiThread {
+                            if (merged) {
+                                activity.toast(R.string.contacts_merged)
+                            } else {
+                                activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+                            }
+                            refreshListener?.refreshContacts(ALL_TABS_MASK)
+                            finishActMode()
                         }
-                        refreshListener?.refreshContacts(ALL_TABS_MASK)
-                        finishActMode()
                     }
                 }
             }
 
-            else -> activity.toast(R.string.cannot_link_private_contacts)
+            LinkMode.REFUSE -> activity.toast(R.string.cannot_link_private_contacts)
         }
     }
 

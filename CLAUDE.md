@@ -182,4 +182,6 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
   (`ViewContactUpdateTest`); `screens/main/` + `MainActivity`, start page,
   import intent and search session so far (`MainUpdateTest`). The list
   rules the shared fragments apply are pure helpers
-  (`helpers/TabContents.kt`, `helpers/ContactSearch.kt`).
+  (`helpers/TabContents.kt`, `helpers/ContactSearch.kt`). The selection
+  bar, delete targets and link mode of the shared `ContactsAdapter` are
+  pure helpers too (`helpers/ContactSelection.kt`, `ContactSelectionTest`).
