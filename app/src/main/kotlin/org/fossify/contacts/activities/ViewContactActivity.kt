@@ -124,7 +124,7 @@ class ViewContactActivity : ContactActivity() {
             }
 
             findItem(R.id.move_to_account).setOnMenuItemClickListener {
-                contact?.let { transferContacts(listOf(it), TransferMode.MOVE) { finish() } }
+                contact?.let { transferContacts(listOf(it), TransferMode.MOVE) { done -> if (done > 0) finish() } }
                 true
             }
 
