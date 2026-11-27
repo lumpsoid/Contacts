@@ -2,7 +2,6 @@ package org.fossify.contacts.helpers
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.Cursor
 import android.graphics.Bitmap
 import android.provider.ContactsContract.RawContacts
 import org.fossify.commons.databases.ContactsDatabase
@@ -169,7 +168,17 @@ private fun Context.recordIdsAfter(after: Int, destination: ContactSource): List
         contentResolver.query(
             RawContacts.CONTENT_URI, projection, selection, arrayOf(after.toString()), sortOrder
         )?.use {
-            ids = ownIds(it, destination)
+            val rows = ArrayList<RawAccountRow>()
+            while (it.moveToNext()) {
+                rows.add(
+                    RawAccountRow(
+                        it.getInt(ID_COLUMN),
+                        it.getString(ACCOUNT_NAME_COLUMN) ?: "",
+                        it.getString(ACCOUNT_TYPE_COLUMN) ?: ""
+                    )
+                )
+            }
+            ids = ownIds(rows, destination)
         }
     } catch (e: SecurityException) {
         showErrorToast(e)
@@ -179,15 +188,12 @@ private fun Context.recordIdsAfter(after: Int, destination: ContactSource): List
     return ids
 }
 
-/** The ids of the rows of [cursor] in the [destination] account, in cursor order. */
-private fun ownIds(cursor: Cursor, destination: ContactSource): List<Int> {
-    val ids = ArrayList<Int>()
-    while (cursor.moveToNext()) {
-        val accountName = cursor.getString(ACCOUNT_NAME_COLUMN) ?: ""
-        val accountType = cursor.getString(ACCOUNT_TYPE_COLUMN) ?: ""
-        if (accountName == destination.name && accountType == destination.type) {
-            ids.add(cursor.getInt(ID_COLUMN))
-        }
-    }
-    return ids
+/** A raw contact row read from the provider: its id and the account it belongs to. */
+data class RawAccountRow(val id: Int, val accountName: String, val accountType: String)
+
+/** The ids of the rows in the [destination] account, in row order. */
+internal fun ownIds(rows: List<RawAccountRow>, destination: ContactSource): List<Int> {
+    return rows
+        .filter { it.accountName == destination.name && it.accountType == destination.type }
+        .map { it.id }
 }
