@@ -184,12 +184,16 @@ class RawContactLoader(private val context: Context) {
         }
 
         contacts.forEach { contact ->
-            val groupIds = memberships[contact.contactId].orEmpty()
-            storedGroups
-                .filter { group -> group.id?.let { groupIds.contains(it) } == true }
-                .forEach { contact.groups.add(Group(it.id, it.title)) }
+            contact.groups.addAll(groupsOfContact(memberships[contact.contactId].orEmpty(), storedGroups))
         }
     }
+}
+
+/** The copies of the [storedGroups] whose id is in [groupIds], in stored order; a group without an id never matches. */
+fun groupsOfContact(groupIds: Set<Long>, storedGroups: List<Group>): List<Group> {
+    return storedGroups
+        .filter { group -> group.id?.let { groupIds.contains(it) } == true }
+        .map { Group(it.id, it.title) }
 }
 
 /**
