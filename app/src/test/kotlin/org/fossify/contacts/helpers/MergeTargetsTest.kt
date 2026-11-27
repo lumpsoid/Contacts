@@ -225,6 +225,34 @@ class MergeTargetsTest {
     }
 
     @Test
+    fun verifyFailsOnALostStar() {
+        val expected = Contact(id = 1, contactId = 1, starred = 1)
+        assertFalse(verifyMerged(expected, Contact(id = 2, contactId = 2, starred = 0)))
+        assertTrue(verifyMerged(expected, Contact(id = 2, contactId = 2, starred = 1)))
+    }
+
+    @Test
+    fun verifyIgnoresAStarTheExpectedLacks() {
+        val expected = Contact(id = 1, contactId = 1, starred = 0)
+        assertTrue(verifyMerged(expected, Contact(id = 2, contactId = 2, starred = 1)))
+    }
+
+    @Test
+    fun verifyFailsOnADifferentRingtone() {
+        val expected = Contact(id = 1, contactId = 1, ringtone = "content://media/1")
+        assertFalse(verifyMerged(expected, Contact(id = 2, contactId = 2, ringtone = "content://media/2")))
+        assertFalse(verifyMerged(expected, Contact(id = 2, contactId = 2, ringtone = null)))
+        assertTrue(verifyMerged(expected, Contact(id = 2, contactId = 2, ringtone = " content://media/1")))
+    }
+
+    @Test
+    fun verifyIgnoresABlankExpectedRingtone() {
+        val actual = Contact(id = 2, contactId = 2, ringtone = "content://media/2")
+        assertTrue(verifyMerged(Contact(id = 1, contactId = 1, ringtone = ""), actual))
+        assertTrue(verifyMerged(Contact(id = 1, contactId = 1, ringtone = null), actual))
+    }
+
+    @Test
     fun photoStatusFollowsTheUri() {
         assertEquals(PHOTO_ADDED, photoUpdateStatus("", "a"))
         assertEquals(PHOTO_CHANGED, photoUpdateStatus("a", "b"))
