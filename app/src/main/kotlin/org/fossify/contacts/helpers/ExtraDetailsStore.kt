@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.OperationApplicationException
 import android.database.Cursor
+import android.database.sqlite.SQLiteException
 import android.os.RemoteException
 import android.provider.ContactsContract
 import android.provider.ContactsContract.CommonDataKinds.Relation
@@ -65,6 +66,12 @@ class ExtraDetailsStore(private val context: Context) {
             context.showErrorToast(e)
             null
         } catch (e: IllegalArgumentException) {
+            context.showErrorToast(e)
+            null
+        } catch (e: IllegalStateException) {
+            context.showErrorToast(e)
+            null
+        } catch (e: SQLiteException) {
             context.showErrorToast(e)
             null
         }
@@ -128,6 +135,12 @@ class ExtraDetailsStore(private val context: Context) {
             context.showErrorToast(e)
             false
         } catch (e: SecurityException) {
+            context.showErrorToast(e)
+            false
+        } catch (e: IllegalArgumentException) {
+            context.showErrorToast(e)
+            false
+        } catch (e: IllegalStateException) {
             context.showErrorToast(e)
             false
         }
