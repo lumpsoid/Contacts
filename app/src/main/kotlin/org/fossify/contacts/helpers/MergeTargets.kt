@@ -19,21 +19,27 @@ fun pickTarget(records: List<MergeRecord>, destination: ContactSource): MergeRec
         )
         .firstOrNull()
 
-/** Writable records to delete: every one but the [target] for DUPLICATES, none for SPLIT_DETAILS. */
+/** Writable records to delete: every one but the [target] for DUPLICATES, none for SPLIT_DETAILS and COPY. */
 fun recordsToDelete(plan: MergePlan, target: MergeRecord?): List<MergeRecord> =
-    if (plan.kind == MergeKind.SPLIT_DETAILS) {
-        emptyList()
-    } else {
-        plan.records.filter { it.isWritable() && it.key != target?.key }
+    when (plan.kind) {
+        MergeKind.DUPLICATES -> plan.records.filter { it.isWritable() && it.key != target?.key }
+        MergeKind.SPLIT_DETAILS, MergeKind.COPY -> emptyList()
     }
 
-/** Raw ids of the device records that stay, except the [target], to link to the result. */
-fun rawIdsToLink(plan: MergePlan, target: MergeRecord?): List<Int> {
-    val deleted = recordsToDelete(plan, target).map { it.key }.toSet()
-    return plan.records
-        .filter { !it.contact.isPrivate() && it.key != target?.key && it.key !in deleted }
-        .map { it.contact.id }
-}
+/**
+ * Raw ids of the device records that stay, except the [target], to link to the result.
+ * None for COPY: the copy is left to the system's own linking.
+ */
+fun rawIdsToLink(plan: MergePlan, target: MergeRecord?): List<Int> =
+    when (plan.kind) {
+        MergeKind.COPY -> emptyList()
+        MergeKind.DUPLICATES, MergeKind.SPLIT_DETAILS -> {
+            val deleted = recordsToDelete(plan, target).map { it.key }.toSet()
+            plan.records
+                .filter { !it.contact.isPrivate() && it.key != target?.key && it.key !in deleted }
+                .map { it.contact.id }
+        }
+    }
 
 /** The run's summary, with the target of each plan picked in [destination] the way the engine picks it. */
 fun summarize(plans: List<MergePlan>, destination: ContactSource) = MergeSummary(
