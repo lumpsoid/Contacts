@@ -87,21 +87,16 @@ class ContactLinkHelper(private val context: Context) {
     }
 
     fun linkRawContacts(rawIds: List<Int>): Boolean {
-        val ids = rawIds.distinct()
-        val pairs = ids.drop(1).map { Pair(ids.first(), it) }
-        return applyAggregationType(pairs, AggregationExceptions.TYPE_KEEP_TOGETHER)
+        return applyAggregationType(linkPairs(rawIds), AggregationExceptions.TYPE_KEEP_TOGETHER)
     }
 
     fun unlinkRawContacts(rawIds: List<Int>): Boolean {
-        val ids = rawIds.distinct()
-        val pairs = ids.flatMapIndexed { index, first -> ids.drop(index + 1).map { Pair(first, it) } }
-        return applyAggregationType(pairs, AggregationExceptions.TYPE_KEEP_SEPARATE)
+        return applyAggregationType(unlinkPairs(rawIds), AggregationExceptions.TYPE_KEEP_SEPARATE)
     }
 
     /** Keeps every raw contact of [first] apart from every raw contact of [second], leaving each side's own links. */
     fun keepApart(first: List<Int>, second: List<Int>): Boolean {
-        val pairs = first.distinct().flatMap { a -> second.distinct().filter { it != a }.map { b -> Pair(a, b) } }
-        return applyAggregationType(pairs, AggregationExceptions.TYPE_KEEP_SEPARATE)
+        return applyAggregationType(keepApartPairs(first, second), AggregationExceptions.TYPE_KEEP_SEPARATE)
     }
 
     private fun applyAggregationType(pairs: List<Pair<Int, Int>>, type: Int): Boolean {
