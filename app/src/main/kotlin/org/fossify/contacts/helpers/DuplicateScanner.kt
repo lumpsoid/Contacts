@@ -44,7 +44,8 @@ class DuplicateScanner(private val context: Context) {
         return sources.map { it to AccountAccess.of(it.type, readOnly) }.filter { it.second.isWritable() }
     }
 
-    private fun toRecords(contacts: List<Contact>): List<MergeRecord> {
+    /** [contacts] with their account type and access; reads the accounts, so call it off the main thread. */
+    fun toRecords(contacts: List<Contact>): List<MergeRecord> {
         val sources = ContactsHelper(context).getDeviceContactSources().toList()
         val readOnly = readOnlyAdapterTypes()
         return contacts.map { contact ->

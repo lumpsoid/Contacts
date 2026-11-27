@@ -31,6 +31,13 @@ class GroupMemberships(private val context: Context) {
         return queryPairs(selection, selectionArgs)
     }
 
+    /** Group row ids [rawId] is a member of; null when unreadable. */
+    fun groupIdsOf(rawId: Int): Set<Long>? {
+        val selection = "${Data.MIMETYPE} = ? AND ${Data.RAW_CONTACT_ID} = ?"
+        val selectionArgs = arrayOf(CommonDataKinds.GroupMembership.CONTENT_ITEM_TYPE, rawId.toString())
+        return queryPairs(selection, selectionArgs)?.map { it.second }?.toSet()
+    }
+
     /**
      * Re-adds the memberships of [before] that are missing now; false when that failed. Reads by the raw contacts
      * of [before], not by aggregate, so an aggregate id that changed during the write does not matter.

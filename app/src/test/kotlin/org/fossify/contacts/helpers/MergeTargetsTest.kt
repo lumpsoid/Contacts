@@ -249,4 +249,23 @@ class MergeTargetsTest {
         val plans = listOf(mergePlan(MergeKind.DUPLICATES, record(1, "A"), record(2, "B")))
         assertEquals(accountA, preferredDestination(plans, listOf(accountA, accountB), "Nope"))
     }
+
+    @Test
+    fun copyDeletesNothing() {
+        val plan = mergePlan(MergeKind.COPY, record(5, "Other"))
+        assertTrue(recordsToDelete(plan, null).isEmpty())
+    }
+
+    @Test
+    fun copyLinksNothing() {
+        val plan = mergePlan(MergeKind.COPY, record(5, "Other"))
+        assertTrue(rawIdsToLink(plan, null).isEmpty())
+    }
+
+    @Test
+    fun aOneRecordDuplicatesPlanDeletesTheRecord() {
+        val only = record(5, "Other")
+        val plan = mergePlan(MergeKind.DUPLICATES, only)
+        assertEquals(listOf(only), recordsToDelete(plan, null))
+    }
 }

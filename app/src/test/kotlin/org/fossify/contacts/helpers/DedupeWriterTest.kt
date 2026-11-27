@@ -187,4 +187,26 @@ class DedupeWriterTest {
         assertTrue(store.deletes().all { it == "delete:" })
         assertEquals(listOf("link:1,2"), store.links())
     }
+
+    @Test
+    fun aCopyWritesAndDeletesNothing() {
+        val plan = mergePlan(MergeKind.COPY, record(5, "B", numbers = listOf("555")))
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Merged(plan.key), outcome)
+        assertTrue(store.calls.contains("insert"))
+        // The writer asks the store to delete an empty list, so no record id may be among the deletes.
+        assertTrue(store.deletes().all { it == "delete:" })
+        assertTrue(store.links().isEmpty())
+    }
+
+    @Test
+    fun aMoveDeletesTheRecordAfterTheWrite() {
+        val plan = mergePlan(MergeKind.DUPLICATES, record(5, "B", numbers = listOf("555")))
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Merged(plan.key), outcome)
+        val insertAt = store.calls.indexOf("insert")
+        val deleteAt = store.calls.indexOfFirst { it.startsWith("delete") }
+        assertTrue(insertAt >= 0 && deleteAt > insertAt)
+        assertEquals(listOf("delete:5"), store.deletes())
+    }
 }
