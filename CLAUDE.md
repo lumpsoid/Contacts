@@ -136,3 +136,21 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
 - <date>: <sha> <subject>; <what was learned>
 ```
 <!-- agent-kit:rules end -->
+
+## Tests
+
+- Unit tests are plain JVM: no Robolectric, no mock libraries, no new
+  test dependencies. `unitTests.isReturnDefaultValues = false`, so a test
+  that reaches an android.jar method throws "Method ... not mocked" instead
+  of passing on 0/null/false. Android compile-time constants
+  (`ContactsContract.CommonDataKinds.*.TYPE_*`) are fine.
+- Rules live in pure functions over plain values (Kotlin types, app and
+  commons models). Border code (cursors, provider, files, clock, caller
+  identity) only reads into plain row data classes and calls the rule;
+  time and identity enter as parameters.
+- Where a shell's ordering must be tested, it goes through one interface
+  at a real border with a hand-written fake (`MergeStore` +
+  `FakeMergeStore`, tested via `DedupeWriter`). No interface that only a
+  test wants.
+- No build runs on the Pi: the gate is `agent-ci` on a work branch
+  (fork-ci.yml: unit tests, detekt, lint, assembleFossDebug).
