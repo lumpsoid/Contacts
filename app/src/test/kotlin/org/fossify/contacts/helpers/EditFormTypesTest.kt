@@ -27,6 +27,46 @@ class EditFormTypesTest {
             CommonDataKinds.Event.TYPE_OTHER,
             typeIdOf("Boat", EVENT_TYPE_LABELS, CommonDataKinds.Event.TYPE_OTHER, label)
         )
+        assertEquals(
+            CommonDataKinds.Email.TYPE_CUSTOM,
+            typeIdOf("Boat", EMAIL_TYPE_LABELS, CommonDataKinds.Email.TYPE_CUSTOM, label)
+        )
+        assertEquals(
+            CommonDataKinds.StructuredPostal.TYPE_CUSTOM,
+            typeIdOf("Boat", ADDRESS_TYPE_LABELS, CommonDataKinds.StructuredPostal.TYPE_CUSTOM, label)
+        )
+        assertEquals(
+            CommonDataKinds.Im.PROTOCOL_CUSTOM,
+            typeIdOf("Boat", IM_TYPE_LABELS, CommonDataKinds.Im.PROTOCOL_CUSTOM, label)
+        )
+    }
+
+    @Test
+    fun tablesMatchEditFormOrder() {
+        assertEquals(
+            listOf(
+                org.fossify.commons.R.string.home to CommonDataKinds.Email.TYPE_HOME,
+                org.fossify.commons.R.string.work to CommonDataKinds.Email.TYPE_WORK,
+                org.fossify.commons.R.string.mobile to CommonDataKinds.Email.TYPE_MOBILE,
+                org.fossify.commons.R.string.other to CommonDataKinds.Email.TYPE_OTHER,
+            ),
+            EMAIL_TYPE_LABELS
+        )
+        assertEquals(
+            listOf(
+                org.fossify.commons.R.string.anniversary to CommonDataKinds.Event.TYPE_ANNIVERSARY,
+                org.fossify.commons.R.string.birthday to CommonDataKinds.Event.TYPE_BIRTHDAY,
+            ),
+            EVENT_TYPE_LABELS
+        )
+        assertEquals(
+            listOf(
+                org.fossify.commons.R.string.home to CommonDataKinds.StructuredPostal.TYPE_HOME,
+                org.fossify.commons.R.string.work to CommonDataKinds.StructuredPostal.TYPE_WORK,
+                org.fossify.commons.R.string.other to CommonDataKinds.StructuredPostal.TYPE_OTHER,
+            ),
+            ADDRESS_TYPE_LABELS
+        )
     }
 
     @Test

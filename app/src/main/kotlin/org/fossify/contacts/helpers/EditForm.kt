@@ -72,7 +72,11 @@ data class NumberRow(
 ) {
     val isFilled: Boolean get() = number.isNotEmpty()
 
-    /** Keeps the fetched normalised number when it is the same number, so loading and saving is no change. */
+    /**
+     * Keeps the fetched normalised number when it is the same number, so loading and saving is no change.
+     * Loaded as +421903123456, the field reads back 0903123456 (seen with WhatsApp contacts); without this,
+     * back would see a change.
+     */
     fun toPhoneNumber(normalize: (String) -> String, sameNumber: (String, String) -> Boolean): PhoneNumber {
         val normalized = normalize(number)
         val kept = if (sameNumber(normalized, fetchedNormalized)) fetchedNormalized else normalized

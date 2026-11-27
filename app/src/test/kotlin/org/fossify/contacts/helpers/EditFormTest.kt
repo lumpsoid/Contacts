@@ -35,12 +35,25 @@ class EditFormTest {
             numbers = listOf(NumberRow()),
             emails = listOf(TypedRow()),
             addresses = listOf(PlainAddress(), StructuredAddress()),
+            ims = listOf(TypedRow("", CommonDataKinds.Im.PROTOCOL_SKYPE)),
             events = listOf(EventRow(shown = "Unknown", date = "x")),
             websites = listOf(""),
         )
         assertTrue(form.isBlank("Unknown"))
         assertFalse(FormSnapshot(events = listOf(EventRow(shown = "1990-01-01", date = "1990-01-01")))
             .isBlank("Unknown"))
+    }
+
+    @Test
+    fun oneFilledRowOfAnyKindMakesFormNotBlank() {
+        listOf(
+            FormSnapshot(numbers = listOf(NumberRow("5", CommonDataKinds.Phone.TYPE_HOME))),
+            FormSnapshot(emails = listOf(TypedRow("a@b", CommonDataKinds.Email.TYPE_HOME))),
+            FormSnapshot(addresses = listOf(PlainAddress("x", CommonDataKinds.StructuredPostal.TYPE_HOME))),
+            FormSnapshot(addresses = listOf(StructuredAddress(city = "Town"))),
+            FormSnapshot(ims = listOf(TypedRow("me", CommonDataKinds.Im.PROTOCOL_SKYPE))),
+            FormSnapshot(websites = listOf("x.org")),
+        ).forEach { assertFalse(it.isBlank("Unknown")) }
     }
 
     @Test
@@ -98,6 +111,28 @@ class EditFormTest {
         )
         val work = PlainAddress("Somewhere 1", CommonDataKinds.StructuredPostal.TYPE_WORK, "Cabin")
         assertEquals("", work.toAddress().label)
+    }
+
+    @Test
+    fun customLabelOnlyForCustomStructuredAddress() {
+        assertEquals(
+            "Cabin",
+            StructuredAddress(city = "Town", type = CommonDataKinds.StructuredPostal.TYPE_CUSTOM, label = "Cabin")
+                .toAddress().label
+        )
+        assertEquals(
+            "",
+            StructuredAddress(city = "Town", type = CommonDataKinds.StructuredPostal.TYPE_WORK, label = "Work")
+                .toAddress().label
+        )
+    }
+
+    @Test
+    fun customLabelOnlyForCustomEmailAndIm() {
+        assertEquals("Mine", TypedRow("a@b", CommonDataKinds.Email.TYPE_CUSTOM, "Mine").toEmail().label)
+        assertEquals("", TypedRow("a@b", CommonDataKinds.Email.TYPE_WORK, "Mine").toEmail().label)
+        assertEquals("Chat", TypedRow("me", CommonDataKinds.Im.PROTOCOL_CUSTOM, "Chat").toIM().label)
+        assertEquals("", TypedRow("me", CommonDataKinds.Im.PROTOCOL_SKYPE, "Chat").toIM().label)
     }
 
     @Test
