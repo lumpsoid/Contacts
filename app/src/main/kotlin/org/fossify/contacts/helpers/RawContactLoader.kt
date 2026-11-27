@@ -261,28 +261,36 @@ fun contactsOf(rows: List<DataRow>, normalize: (String) -> String): Map<Int, Con
     return contacts
 }
 
-private fun dataRowOf(cursor: Cursor) = DataRow(
-    rawId = cursor.getIntValue(Data.RAW_CONTACT_ID),
-    contactId = cursor.getIntValue(Data.CONTACT_ID),
-    mimetype = cursor.getStringValue(Data.MIMETYPE),
-    isPrimary = cursor.getIntValue(Data.IS_PRIMARY),
-    data1 = cursor.getStringValue(Data.DATA1),
-    data2Int = cursor.getIntValue(Data.DATA2),
-    data3 = cursor.getStringValue(Data.DATA3),
-    data4 = cursor.getStringValue(Data.DATA4),
-    data5 = cursor.getStringValue(Data.DATA5),
-    data5Int = cursor.getIntValue(Data.DATA5),
-    data6 = cursor.getStringValue(Data.DATA6),
-    data7 = cursor.getStringValue(Data.DATA7),
-    data8 = cursor.getStringValue(Data.DATA8),
-    data9 = cursor.getStringValue(Data.DATA9),
-    data10 = cursor.getStringValue(Data.DATA10),
-    accountName = cursor.getStringValue(RawContacts.ACCOUNT_NAME),
-    starred = cursor.getIntValue(CommonDataKinds.StructuredName.STARRED),
-    photoUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_URI),
-    photoThumbnailUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_THUMBNAIL_URI),
-    customRingtone = cursor.getStringValue(CommonDataKinds.StructuredName.CUSTOM_RINGTONE)
-)
+/**
+ * Reads one data row. Data columns are read only for mimetypes a reader maps, since other rows may hold
+ * blobs that a string or int read throws on; the other rows keep null / 0 for them.
+ */
+private fun dataRowOf(cursor: Cursor): DataRow {
+    val mimetype = cursor.getStringValue(Data.MIMETYPE)
+    val mapped = DATA_READERS.containsKey(mimetype)
+    return DataRow(
+        rawId = cursor.getIntValue(Data.RAW_CONTACT_ID),
+        contactId = cursor.getIntValue(Data.CONTACT_ID),
+        mimetype = mimetype,
+        isPrimary = if (mapped) cursor.getIntValue(Data.IS_PRIMARY) else 0,
+        data1 = if (mapped) cursor.getStringValue(Data.DATA1) else null,
+        data2Int = if (mapped) cursor.getIntValue(Data.DATA2) else 0,
+        data3 = if (mapped) cursor.getStringValue(Data.DATA3) else null,
+        data4 = if (mapped) cursor.getStringValue(Data.DATA4) else null,
+        data5 = if (mapped) cursor.getStringValue(Data.DATA5) else null,
+        data5Int = if (mapped) cursor.getIntValue(Data.DATA5) else 0,
+        data6 = if (mapped) cursor.getStringValue(Data.DATA6) else null,
+        data7 = if (mapped) cursor.getStringValue(Data.DATA7) else null,
+        data8 = if (mapped) cursor.getStringValue(Data.DATA8) else null,
+        data9 = if (mapped) cursor.getStringValue(Data.DATA9) else null,
+        data10 = if (mapped) cursor.getStringValue(Data.DATA10) else null,
+        accountName = cursor.getStringValue(RawContacts.ACCOUNT_NAME),
+        starred = cursor.getIntValue(CommonDataKinds.StructuredName.STARRED),
+        photoUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_URI),
+        photoThumbnailUri = cursor.getStringValue(CommonDataKinds.StructuredName.PHOTO_THUMBNAIL_URI),
+        customRingtone = cursor.getStringValue(CommonDataKinds.StructuredName.CUSTOM_RINGTONE)
+    )
+}
 
 private typealias DataReader = (contact: Contact, row: DataRow, normalize: (String) -> String) -> Unit
 
