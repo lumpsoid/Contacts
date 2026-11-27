@@ -72,6 +72,7 @@ private fun String.comparable() = trim().lowercase()
  * Whether [actual] holds everything the merge wrote in [expected]: each non-blank name part, nickname, notes and
  * organization field, every number (digits and "+"), email, address, IM, event, website and group title, and a photo
  * when [expected] has one. Compared trimmed and ignoring case; photo contents are not compared.
+ * A star and a ringtone set on [expected] must be on [actual].
  * Sources are deleted only when this holds.
  */
 fun verifyMerged(expected: Contact, actual: Contact): Boolean {
@@ -83,7 +84,10 @@ fun verifyMerged(expected: Contact, actual: Contact): Boolean {
         field(expected).map { it.comparable() }.filter { it.isNotEmpty() }.all { it in held }
     }
     val photoHeld = !hasPhoto(expected) || hasPhoto(actual)
-    return textsHeld && listsHeld && photoHeld
+    val starHeld = expected.starred == 0 || actual.starred != 0
+    val ringtoneHeld = expected.ringtone.isNullOrBlank() ||
+        expected.ringtone?.trim() == actual.ringtone?.trim()
+    return textsHeld && listsHeld && photoHeld && starHeld && ringtoneHeld
 }
 
 private fun hasPhoto(contact: Contact) = contact.photoUri.isNotEmpty() || contact.photo != null

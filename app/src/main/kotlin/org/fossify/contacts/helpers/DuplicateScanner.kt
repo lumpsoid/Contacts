@@ -12,6 +12,7 @@ import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.contacts.extensions.getContactsWithNameless
 import org.fossify.contacts.models.AccountAccess
+import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeRecord
 import org.fossify.contacts.models.ScanResult
 
@@ -44,13 +45,26 @@ class DuplicateScanner(private val context: Context) {
         return sources.map { it to AccountAccess.of(it.type, readOnly) }.filter { it.second.isWritable() }
     }
 
-    /** [contacts] with their account type and access; reads the accounts, so call it off the main thread. */
+    /**
+     * [contacts] with their account type, access and extra details; reads the accounts and the provider,
+     * so call it off the main thread.
+     */
     fun toRecords(contacts: List<Contact>): List<MergeRecord> {
         val sources = ContactsHelper(context).getDeviceContactSources().toList()
         val readOnly = readOnlyAdapterTypes()
+        val extras = if (contacts.all { it.isPrivate() }) {
+            emptyMap<Int, ExtraDetails>()
+        } else {
+            ExtraDetailsStore(context).readAll()
+        }
         return contacts.map { contact ->
             val type = if (contact.isPrivate()) SMT_PRIVATE else accountTypeOf(contact.source, sources)
-            MergeRecord(contact, type ?: "", AccountAccess.of(type, readOnly))
+            val details = when {
+                contact.isPrivate() -> ExtraDetails()
+                extras == null -> null
+                else -> extras[contact.id] ?: ExtraDetails()
+            }
+            MergeRecord(contact, type ?: "", AccountAccess.of(type, readOnly), details)
         }
     }
 

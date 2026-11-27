@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Group
+import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeRecord
 
 /** The contact storage a merge reads and writes: the system provider and this app's private database. */
@@ -25,6 +26,9 @@ interface MergeStore {
 
     /** The stored record [id] of [destination], or null when it cannot be read. */
     fun readBack(id: Int, destination: ContactSource): Contact?
+
+    /** Adds to the device raw contact [rawId] the parts of [extras] it lacks; whether reading it back holds them. */
+    fun addExtras(rawId: Int, extras: ExtraDetails): Boolean
 
     /** Deletes [contacts]; false when the delete failed. */
     fun delete(contacts: List<Contact>): Boolean

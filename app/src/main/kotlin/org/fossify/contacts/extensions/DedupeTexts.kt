@@ -59,6 +59,7 @@ fun Context.conflictText(
 fun Context.failureText(reason: MergeFailure): String = getString(
     when (reason) {
         MergeFailure.SIM_LIMIT -> R.string.dedupe_fail_sim
+        MergeFailure.NO_ROOM -> R.string.dedupe_fail_no_room
         MergeFailure.WRITE_FAILED -> R.string.dedupe_fail_write
         MergeFailure.DELETE_FAILED -> R.string.dedupe_fail_delete
         MergeFailure.LINK_FAILED -> R.string.dedupe_fail_link

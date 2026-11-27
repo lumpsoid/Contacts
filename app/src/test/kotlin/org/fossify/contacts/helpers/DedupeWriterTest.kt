@@ -1,10 +1,13 @@
 package org.fossify.contacts.helpers
 
+import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 import org.fossify.commons.models.contacts.Email
 import org.fossify.contacts.models.AccountAccess
+import org.fossify.contacts.models.ExtraDetails
+import org.fossify.contacts.models.LabeledValue
 import org.fossify.contacts.models.MergeChoices
 import org.fossify.contacts.models.MergeFailure
 import org.fossify.contacts.models.MergeKind
@@ -20,6 +23,8 @@ class DedupeWriterTest {
     private val whatsApp = record(3, "WhatsApp", type = "com.whatsapp", access = AccountAccess.READ_ONLY)
     private val store = FakeMergeStore()
     private val writer = DedupeWriter(store)
+    private val sip = ExtraDetails(sipAddresses = listOf(LabeledValue("ann@sip.example", 1, "")))
+    private val privateStorage = ContactSource(SMT_PRIVATE, SMT_PRIVATE, "Phone storage")
 
     private fun record(
         id: Int,
@@ -208,5 +213,91 @@ class DedupeWriterTest {
         val deleteAt = store.calls.indexOfFirst { it.startsWith("delete") }
         assertTrue(insertAt >= 0 && deleteAt > insertAt)
         assertEquals(listOf("delete:5"), store.deletes())
+    }
+
+    /** A record in account B with a number and the SIP address, to move into A. */
+    private fun movedWithSip() = record(1, "B", numbers = listOf("111")).copy(extras = sip)
+
+    @Test
+    fun aMoveAddsExtrasBeforeDeletingTheSource() {
+        val plan = mergePlan(MergeKind.DUPLICATES, movedWithSip())
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Merged(plan.key), outcome)
+        assertEquals(listOf("groups", "insert", "readBack:100", "extras:100", "delete:1"), store.calls)
+        assertEquals(sip, store.addedExtras)
+    }
+
+    @Test
+    fun extrasThatDoNotLandDeleteOnlyTheNewRecord() {
+        store.extrasWork = false
+        val plan = mergePlan(MergeKind.DUPLICATES, movedWithSip())
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.WRITE_FAILED), outcome)
+        assertEquals(listOf("delete:${FakeMergeStore.NEW_ID}"), store.deletes())
+    }
+
+    @Test
+    fun aMergeAddsExtrasToTheKeptTarget() {
+        val plan = mergePlan(
+            MergeKind.DUPLICATES,
+            record(1, "A", numbers = listOf("111")),
+            record(2, "A", numbers = listOf("222")).copy(extras = sip)
+        )
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Merged(plan.key), outcome)
+        assertEquals(listOf("groups", "update:1", "readBack:1", "extras:1", "delete:2"), store.calls)
+        assertEquals(sip, store.addedExtras)
+    }
+
+    @Test
+    fun aMoveIntoPrivateStorageThatWouldLoseExtrasWritesNothing() {
+        val plan = mergePlan(MergeKind.DUPLICATES, movedWithSip())
+        val outcome = writer.merge(plan, privateStorage, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.NO_ROOM), outcome)
+        assertTrue(store.calls.isEmpty())
+    }
+
+    @Test
+    fun aMoveToASimThatWouldLoseExtrasWritesNothing() {
+        val plan = mergePlan(MergeKind.DUPLICATES, movedWithSip())
+        val outcome = writer.merge(plan, accountA, AccountAccess.SIM)
+        assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.NO_ROOM), outcome)
+        assertTrue(store.calls.isEmpty())
+    }
+
+    @Test
+    fun aCopyIntoPrivateStorageRunsWithoutExtras() {
+        val plan = mergePlan(MergeKind.COPY, movedWithSip())
+        val outcome = writer.merge(plan, privateStorage, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Merged(plan.key), outcome)
+        assertTrue(store.calls.none { it.startsWith("extras") })
+        // The writer asks the store to delete an empty list, which records a bare "delete:".
+        assertEquals(listOf("delete:"), store.deletes())
+    }
+
+    @Test
+    fun unreadableExtrasWriteNothing() {
+        val plan = mergePlan(MergeKind.DUPLICATES, record(1, "B", numbers = listOf("111")).copy(extras = null))
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.WRITE_FAILED), outcome)
+        assertTrue(store.calls.isEmpty())
+    }
+
+    @Test
+    fun aLostStarDeletesNothing() {
+        val starred = record(1, "B", numbers = listOf("111")).let { it.copy(contact = it.contact.copy(starred = 1)) }
+        val plan = mergePlan(MergeKind.DUPLICATES, starred)
+        // The new copy reads back with the number but without the star.
+        store.storedById[FakeMergeStore.NEW_ID] = Contact(
+            id = FakeMergeStore.NEW_ID,
+            contactId = FakeMergeStore.NEW_ID,
+            source = "A",
+            phoneNumbers = arrayListOf(PhoneNumber("111", 0, "", "111")),
+            starred = 0
+        )
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.WRITE_FAILED), outcome)
+        // Only the unverified new copy is deleted; the source record 1 stays.
+        assertEquals(listOf("delete:${FakeMergeStore.NEW_ID}"), store.deletes())
     }
 }
