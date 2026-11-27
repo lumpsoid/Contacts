@@ -1351,7 +1351,7 @@ class EditContactActivity : ContactActivity() {
         val eventHolder = ItemEventBinding.bind(binding.contactEventsHolder.getChildAt(i))
         EventRow(
             shown = eventHolder.contactEvent.value,
-            date = eventHolder.contactEvent.tag.toString(),
+            date = eventHolder.contactEvent.tag?.toString() ?: "",
             type = typeOf(eventHolder.contactEventType, EVENT_TYPE_LABELS, CommonDataKinds.Event.TYPE_OTHER),
         )
     }
