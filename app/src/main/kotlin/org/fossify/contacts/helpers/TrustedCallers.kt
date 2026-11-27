@@ -14,6 +14,16 @@ fun isTrustedCaller(callerCertDigests: Collection<String>, ownCertDigests: Colle
     return callerCertDigests.any { it.lowercase() in trusted }
 }
 
+/** Whether a caller may read private contacts; digests are only computed when needed. */
+fun canReadPrivateContacts(
+    showPrivateContacts: Boolean,
+    callingUid: Int,
+    myUid: Int,
+    callerCertDigests: () -> Collection<String>,
+    ownCertDigests: () -> Collection<String>,
+): Boolean = showPrivateContacts &&
+    (callingUid == myUid || isTrustedCaller(callerCertDigests(), ownCertDigests()))
+
 /** Lower-case hex SHA-256 of [bytes], the form [isTrustedCaller] compares. */
 fun sha256Hex(bytes: ByteArray): String =
     MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

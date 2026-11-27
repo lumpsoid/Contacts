@@ -57,15 +57,7 @@ class DuplicateScanner(private val context: Context) {
         } else {
             ExtraDetailsStore(context).readAll()
         }
-        return contacts.map { contact ->
-            val type = if (contact.isPrivate()) SMT_PRIVATE else accountTypeOf(contact.source, sources)
-            val details = when {
-                contact.isPrivate() -> ExtraDetails()
-                extras == null -> null
-                else -> extras[contact.id] ?: ExtraDetails()
-            }
-            MergeRecord(contact, type ?: "", AccountAccess.of(type, readOnly), details)
-        }
+        return mergeRecordsOf(contacts, sources, readOnly, extras)
     }
 
     private fun readOnlyAdapterTypes(): Set<String> = ContentResolver.getSyncAdapterTypes()
@@ -77,3 +69,24 @@ class DuplicateScanner(private val context: Context) {
 /** The type of the account named [name] among [sources]; null when none or several types carry that name. */
 fun accountTypeOf(name: String, sources: List<ContactSource>): String? =
     sources.filter { it.name == name }.map { it.type }.distinct().singleOrNull()
+
+/**
+ * [contacts] as records with their account type, access and extra details. Pure: the caller loads
+ * [sources], [readOnlyTypes] and [extras]. [extras] null: they could not be read.
+ */
+fun mergeRecordsOf(
+    contacts: List<Contact>,
+    sources: List<ContactSource>,
+    readOnlyTypes: Set<String>,
+    extras: Map<Int, ExtraDetails>?
+): List<MergeRecord> {
+    return contacts.map { contact ->
+        val type = if (contact.isPrivate()) SMT_PRIVATE else accountTypeOf(contact.source, sources)
+        val details = when {
+            contact.isPrivate() -> ExtraDetails()
+            extras == null -> null
+            else -> extras[contact.id] ?: ExtraDetails()
+        }
+        MergeRecord(contact, type ?: "", AccountAccess.of(type, readOnlyTypes), details)
+    }
+}
