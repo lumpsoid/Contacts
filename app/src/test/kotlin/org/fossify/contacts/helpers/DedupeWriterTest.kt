@@ -1,5 +1,6 @@
 package org.fossify.contacts.helpers
 
+import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
@@ -245,6 +246,7 @@ class DedupeWriterTest {
         val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
         assertEquals(MergeOutcome.Merged(plan.key), outcome)
         assertEquals(listOf("groups", "update:1", "readBack:1", "extras:1", "delete:2"), store.calls)
+        assertEquals(sip, store.addedExtras)
     }
 
     @Test
@@ -279,5 +281,23 @@ class DedupeWriterTest {
         val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
         assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.WRITE_FAILED), outcome)
         assertTrue(store.calls.isEmpty())
+    }
+
+    @Test
+    fun aLostStarDeletesNothing() {
+        val starred = record(1, "B", numbers = listOf("111")).let { it.copy(contact = it.contact.copy(starred = 1)) }
+        val plan = mergePlan(MergeKind.DUPLICATES, starred)
+        // The new copy reads back with the number but without the star.
+        store.storedById[FakeMergeStore.NEW_ID] = Contact(
+            id = FakeMergeStore.NEW_ID,
+            contactId = FakeMergeStore.NEW_ID,
+            source = "A",
+            phoneNumbers = arrayListOf(PhoneNumber("111", 0, "", "111")),
+            starred = 0
+        )
+        val outcome = writer.merge(plan, accountA, AccountAccess.WRITABLE)
+        assertEquals(MergeOutcome.Failed(plan.key, MergeFailure.WRITE_FAILED), outcome)
+        // Only the unverified new copy is deleted; the source record 1 stays.
+        assertEquals(listOf("delete:${FakeMergeStore.NEW_ID}"), store.deletes())
     }
 }
