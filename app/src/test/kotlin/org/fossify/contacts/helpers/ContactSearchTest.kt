@@ -61,12 +61,16 @@ class ContactSearchTest {
 
     @Test
     fun namelessContactIsFoundByItsNumber() {
+        // The display name falls back to the first number, so the second is reachable only through the number rule.
         val contact = Contact(
             id = 1,
             contactId = 1,
-            phoneNumbers = arrayListOf(PhoneNumber("555-0100", 0, "", "5550100"))
+            phoneNumbers = arrayListOf(
+                PhoneNumber("111", 0, "", "111"),
+                PhoneNumber("555-0100", 0, "", "5550100")
+            )
         )
-        assertEquals(listOf(1), ids(listOf(contact).matching(query("0100"))))
+        assertEquals(listOf(1), ids(listOf(contact).matching(query("5550100"))))
     }
 
     @Test

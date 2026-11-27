@@ -47,6 +47,17 @@ class TabContentsTest {
     }
 
     @Test
+    fun favouritesTabMergesLinkedDuplicatesWhenMergingIsOn() {
+        val contacts = listOf(
+            contact(1, starred = 1, contactId = 7),
+            contact(2, starred = 1, contactId = 7),
+            contact(3, starred = 1, contactId = 8)
+        )
+        assertEquals(3, tabContents(ListTab.FAVORITES, contacts, filter(merge = false)).size)
+        assertEquals(2, tabContents(ListTab.FAVORITES, contacts, filter(merge = true)).size)
+    }
+
+    @Test
     fun favouritesKeepTheirLoadOrderWithoutCustomOrder() {
         val contacts = listOf(contact(3, starred = 1), contact(1, starred = 1), contact(2, starred = 1))
         assertEquals(listOf(3, 1, 2), ids(tabContents(ListTab.FAVORITES, contacts, filter(order = null))))

@@ -12,7 +12,7 @@ private val SEARCH_SPACES = "\\s+".toRegex()
  */
 data class SearchQuery(val text: String, val digits: String) {
     // Text without diacritics matches names that have them (c finds č); text with them matches as typed.
-    val normalize: Boolean get() = text.normalizeString() == text
+    val normalize: Boolean = text.normalizeString() == text
 }
 
 /** [raw] as a [SearchQuery]; [normalizeNumber] is the platform's phone-number normaliser. */
