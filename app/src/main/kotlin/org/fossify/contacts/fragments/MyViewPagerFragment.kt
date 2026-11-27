@@ -32,8 +32,11 @@ import org.fossify.contacts.helpers.AVOID_CHANGING_TEXT_TAG
 import org.fossify.contacts.helpers.AVOID_CHANGING_VISIBILITY_TAG
 import org.fossify.contacts.helpers.Config
 import org.fossify.contacts.helpers.GROUP
-import org.fossify.contacts.helpers.distinctByLinkedContact
-import org.fossify.contacts.helpers.inSources
+import org.fossify.contacts.helpers.ListTab
+import org.fossify.contacts.helpers.TabFilter
+import org.fossify.contacts.helpers.matching
+import org.fossify.contacts.helpers.searchQuery
+import org.fossify.contacts.helpers.tabContents
 import org.fossify.contacts.interfaces.RefreshContactsListener
 import java.util.Locale
 
@@ -128,27 +131,12 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
         }
 
         allContacts = contacts
-        val filtered = when (this) {
-            is GroupsFragment -> contacts.inSources(activity!!.getVisibleContactSources())
-            is FavoritesFragment -> {
-                val contactSources = activity!!.getVisibleContactSources()
-                val favouriteContacts = contacts
-                    .filter { it.starred == 1 && contactSources.contains(it.source) }
-                    .let { if (config.mergeDuplicateContacts) it.distinctByLinkedContact() else it }
-
-                if (activity!!.config.isCustomOrderSelected) {
-                    sortFavourites(favouriteContacts)
-                } else {
-                    favouriteContacts
-                }
-            }
-
-            else -> {
-                val contactSources = activity!!.getVisibleContactSources()
-                contacts.filter { contactSources.contains(it.source) }
-                    .let { if (config.mergeDuplicateContacts) it.distinctByLinkedContact() else it }
-            }
+        val tab = when (this) {
+            is GroupsFragment -> ListTab.GROUPS
+            is FavoritesFragment -> ListTab.FAVORITES
+            else -> ListTab.CONTACTS
         }
+        val filtered = tabContents(tab, contacts, tabFilter(tab))
 
         var currentHash = 0
         filtered.forEach {
@@ -171,18 +159,17 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
         }
     }
 
-    private fun sortFavourites(contacts: List<Contact>): List<Contact> {
-        val favoritesOrder = activity?.config?.favoritesContactsOrder
-        if (favoritesOrder.isNullOrEmpty()) {
-            return contacts
+    private fun tabFilter(tab: ListTab): TabFilter {
+        val storedOrder = if (tab == ListTab.FAVORITES && config.isCustomOrderSelected) {
+            config.favoritesContactsOrder
+        } else {
+            ""
         }
-
-        val orderList = Converters().jsonToStringList(favoritesOrder)
-        val map = orderList.withIndex().associate { it.value to it.index }
-
-        return contacts.sortedBy { contact ->
-            map[contact.id.toString()]
-        }
+        return TabFilter(
+            visibleSources = activity!!.getVisibleContactSources(),
+            mergeDuplicates = config.mergeDuplicateContacts,
+            favouritesOrder = storedOrder.takeIf { it.isNotEmpty() }?.let { Converters().jsonToStringList(it) }
+        )
     }
 
     private fun setupContacts(contacts: List<Contact>) {
@@ -313,28 +300,10 @@ abstract class MyViewPagerFragment<Binding : MyViewPagerFragment.InnerBinding>(c
 
     fun onSearchQueryChanged(text: String) {
         val adapter = innerBinding.fragmentList.adapter
-        val fixedText = text.trim().replace("\\s+".toRegex(), " ")
+        val query = searchQuery(text) { it.normalizePhoneNumber() }
+        val fixedText = query.text
         if (adapter is ContactsAdapter) {
-            val shouldNormalize = fixedText.normalizeString() == fixedText
-            val filtered = contactsIgnoringSearch.filter {
-                getProperText(it.getNameToDisplay(), shouldNormalize).contains(fixedText, true) ||
-                    getProperText(it.nickname, shouldNormalize).contains(fixedText, true) ||
-                    (fixedText.toLongOrNull() != null && it.phoneNumbers.any {
-                        fixedText.normalizePhoneNumber().isNotEmpty() && it.normalizedNumber.contains(fixedText.normalizePhoneNumber(), true)
-                    }) ||
-                    it.emails.any { it.value.contains(fixedText, true) } ||
-                    it.addresses.any { getProperText(it.value, shouldNormalize).contains(fixedText, true) } ||
-                    it.IMs.any { it.value.contains(fixedText, true) } ||
-                    getProperText(it.notes, shouldNormalize).contains(fixedText, true) ||
-                    getProperText(it.organization.company, shouldNormalize).contains(fixedText, true) ||
-                    getProperText(it.organization.jobPosition, shouldNormalize).contains(fixedText, true) ||
-                    it.websites.any { it.contains(fixedText, true) }
-            } as ArrayList
-
-            filtered.sortBy {
-                val nameToDisplay = it.getNameToDisplay()
-                !getProperText(nameToDisplay, shouldNormalize).startsWith(fixedText, true) && !nameToDisplay.contains(fixedText, true)
-            }
+            val filtered = contactsIgnoringSearch.matching(query)
 
             if (filtered.isEmpty() && this@MyViewPagerFragment is FavoritesFragment) {
                 if (innerBinding.fragmentPlaceholder.tag != AVOID_CHANGING_TEXT_TAG) {

@@ -198,15 +198,9 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         binding.mainMenu.toggleHideOnScroll(false)
         binding.mainMenu.setupMenu()
 
-        binding.mainMenu.onSearchClosedListener = {
-            getAllFragments().forEach {
-                it?.onSearchClosed()
-            }
-        }
-
-        binding.mainMenu.onSearchTextChangedListener = { text ->
-            getCurrentFragment()?.onSearchQueryChanged(text)
-        }
+        binding.mainMenu.onSearchOpenListener = { dispatch(MainAction.SearchOpened) }
+        binding.mainMenu.onSearchClosedListener = { dispatch(MainAction.SearchClosed) }
+        binding.mainMenu.onSearchTextChangedListener = { text -> dispatch(MainAction.SearchTextChanged(text)) }
 
         binding.mainMenu.requireToolbar().setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
@@ -432,6 +426,10 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             }
 
             MainEffect.RefreshAll -> refreshContacts(ALL_TABS_MASK)
+
+            is MainEffect.FilterPage -> getCurrentFragment()?.onSearchQueryChanged(effect.text)
+
+            MainEffect.ClearSearch -> getAllFragments().forEach { it?.onSearchClosed() }
         }
     }
 
@@ -458,9 +456,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             },
             tabSelectedAction = {
                 binding.viewPager.currentItem = it.position
-                if (binding.mainMenu.isSearchOpen) {
-                    getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
-                }
+                dispatch(MainAction.PageSelected)
                 updateBottomTabItemColors(it.customView, true, getSelectedTabDrawableIds()[it.position])
             }
         )
@@ -559,9 +555,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
                 }
             }
 
-            if (binding.mainMenu.isSearchOpen) {
-                getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
-            }
+            dispatch(MainAction.ListsRefreshed)
 
             if (nextMask != 0) {
                 refreshContacts(nextMask)

@@ -17,6 +17,7 @@ private const val SCHEME_CONTENT = "content"
 fun update(state: MainState, action: A): MainNext = when (action) {
     is A.Tabs -> onTabs(state, action)
     is A.Import -> onImport(state, action)
+    is A.Search -> onSearch(state, action)
 }
 
 private fun onTabs(state: MainState, action: A.Tabs): MainNext = when (action) {
@@ -24,12 +25,24 @@ private fun onTabs(state: MainState, action: A.Tabs): MainNext = when (action) {
         val page = startPage(action.tabs)
         Next(state.copy(startPage = page), listOf(E.ShowPage(page)))
     }
+    A.PageSelected, A.ListsRefreshed -> Next(state, refilter(state))
 }
 
 private fun onImport(state: MainState, action: A.Import): MainNext = when (action) {
     is A.IntentReceived -> Next(state, importEffects(action.facts))
     is A.ImportFinished -> Next(state, if (action.success) listOf(E.RefreshAll) else emptyList())
 }
+
+private fun onSearch(state: MainState, action: A.Search): MainNext = when (action) {
+    A.SearchOpened -> Next(state.copy(searchOpen = true))
+    // Every change filters, even closed: commons clears the box just after closing, as upstream forwarded.
+    is A.SearchTextChanged -> Next(state.copy(searchText = action.text), listOf(E.FilterPage(action.text)))
+    A.SearchClosed -> Next(state.copy(searchOpen = false), listOf(E.ClearSearch))
+}
+
+/** An open search filters the page shown and every refreshed list again, with the box's text. */
+private fun refilter(state: MainState): List<E> =
+    if (state.searchOpen) listOf(E.FilterPage(state.searchText)) else emptyList()
 
 /**
  * The pager index to open on. TAB_LAST_USED reopens the stored page unchecked; a fixed tab opens at its

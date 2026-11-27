@@ -5,9 +5,12 @@ import org.fossify.commons.helpers.TAB_CONTACTS
 import org.fossify.commons.helpers.TAB_FAVORITES
 import org.fossify.commons.helpers.TAB_GROUPS
 import org.fossify.commons.helpers.TAB_LAST_USED
+import org.fossify.contacts.screens.Next
 import org.fossify.contacts.screens.main.MainAction as A
 import org.fossify.contacts.screens.main.MainEffect as E
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainUpdateTest {
@@ -20,6 +23,10 @@ class MainUpdateTest {
 
     private fun import(kind: IntentKind, data: IntentUri? = null, stream: IntentUri? = null) =
         update(MainState(), A.IntentReceived(ImportFacts(kind, data, stream))).effects
+
+    /** Feeds the actions through the update in order and returns the last step's result. */
+    private fun run(vararg actions: A, from: MainState = MainState()) =
+        actions.fold(Next<MainState, E>(from)) { next, action -> update(next.state, action) }
 
     @Test
     fun lastUsedReopensTheStoredPageUnchecked() {
@@ -102,5 +109,61 @@ class MainUpdateTest {
     fun importSuccessRefreshesAllTabs() {
         assertEquals(listOf(E.RefreshAll), update(MainState(), A.ImportFinished(true)).effects)
         assertEquals(emptyList<E>(), update(MainState(), A.ImportFinished(false)).effects)
+    }
+
+    @Test
+    fun searchStartsClosed() {
+        assertFalse(MainState().searchOpen)
+        assertEquals(emptyList<E>(), update(MainState(), A.PageSelected).effects)
+        assertEquals(emptyList<E>(), update(MainState(), A.ListsRefreshed).effects)
+    }
+
+    @Test
+    fun openingSearchWithNoTextRefiltersWithEmptyText() {
+        assertEquals(listOf(E.FilterPage("")), run(A.SearchOpened, A.ListsRefreshed).effects)
+    }
+
+    @Test
+    fun typingFiltersTheCurrentPage() {
+        val next = run(A.SearchOpened, A.SearchTextChanged("ann"))
+        assertEquals(listOf(E.FilterPage("ann")), next.effects)
+        assertEquals("ann", next.state.searchText)
+        assertTrue(next.state.searchOpen)
+    }
+
+    @Test
+    fun textRestoredBeforeOpenIsUsedOnceOpen() {
+        val next = run(A.SearchTextChanged("ann"), A.SearchOpened, A.PageSelected)
+        assertEquals(listOf(E.FilterPage("ann")), next.effects)
+    }
+
+    @Test
+    fun switchingPageRefiltersWithTheCurrentText() {
+        val typed = arrayOf(A.SearchOpened, A.SearchTextChanged("ann"))
+        assertEquals(listOf(E.FilterPage("ann")), run(*typed, A.PageSelected).effects)
+        assertEquals(listOf(E.FilterPage("ann")), run(*typed, A.ListsRefreshed).effects)
+    }
+
+    @Test
+    fun reopeningKeepsTheText() {
+        val next = run(A.SearchOpened, A.SearchTextChanged("ann"), A.SearchOpened)
+        assertEquals("ann", next.state.searchText)
+        assertTrue(next.state.searchOpen)
+    }
+
+    @Test
+    fun closingClearsAllPages() {
+        val next = run(A.SearchOpened, A.SearchTextChanged("ann"), A.SearchClosed)
+        assertEquals(listOf(E.ClearSearch), next.effects)
+        assertFalse(next.state.searchOpen)
+    }
+
+    @Test
+    fun textClearedAfterCloseStillFiltersButLeavesSearchClosed() {
+        val next = run(A.SearchOpened, A.SearchClosed, A.SearchTextChanged(""))
+        assertEquals(listOf(E.FilterPage("")), next.effects)
+        assertEquals("", next.state.searchText)
+        assertFalse(next.state.searchOpen)
+        assertEquals(emptyList<E>(), update(next.state, A.PageSelected).effects)
     }
 }

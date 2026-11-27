@@ -123,12 +123,10 @@
     <ID>MaxLineLength:MyContactsContentProvider.kt$MyContactsContentProvider$override</ID>
     <ID>MaxLineLength:MyDatePickerDialog.kt$MyDatePickerDialog$class</ID>
     <ID>MaxLineLength:MyDatePickerDialog.kt$MyDatePickerDialog$val dialogBackgroundColor = activity.getColor(org.fossify.commons.R.color.you_dialog_background_color)</ID>
-    <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$!getProperText(nameToDisplay, shouldNormalize).startsWith(fixedText, true) &amp;&amp; !nameToDisplay.contains(fixedText, true)</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$GroupsAdapter</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$abstract</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$contactsIgnoringSearch = (innerBinding.fragmentList.adapter as? ContactsAdapter)?.contactItems ?: ArrayList()</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$contactsIgnoringSearch = (innerBinding.fragmentList.adapter as? ContactsAdapter)?.contactItems ?: listOf()</ID>
-    <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$fixedText.normalizePhoneNumber().isNotEmpty() &amp;&amp; it.normalizedNumber.contains(fixedText.normalizePhoneNumber(), true)</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$if</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$innerBinding.fragmentFab.contentDescription = activity.getString(org.fossify.commons.R.string.add_favorites)</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$innerBinding.fragmentFab.contentDescription = activity.getString(org.fossify.commons.R.string.create_new_contact)</ID>

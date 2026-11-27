@@ -179,5 +179,7 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
   (`Load`/`Delete`/…, `Ui`/`Load`/`Write`) so each `when` stays under
   detekt's CyclomaticComplexMethod limit.
 - Screens on the loop: `screens/viewcontact/` + `ViewContactActivity`
-  (`ViewContactUpdateTest`); `screens/main/` + `MainActivity`, start page
-  and import intent only so far (`MainUpdateTest`).
+  (`ViewContactUpdateTest`); `screens/main/` + `MainActivity`, start page,
+  import intent and search session so far (`MainUpdateTest`). The list
+  rules the shared fragments apply are pure helpers
+  (`helpers/TabContents.kt`, `helpers/ContactSearch.kt`).

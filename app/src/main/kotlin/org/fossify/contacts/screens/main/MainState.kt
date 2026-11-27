@@ -12,5 +12,9 @@ data class IntentUri(val value: String, val scheme: String?)
 /** The launch intent as plain values. [stream] is EXTRA_STREAM, read by the shell only for ACTION_SEND. */
 data class ImportFacts(val kind: IntentKind, val data: IntentUri?, val stream: IntentUri?)
 
-/** The main screen's state: the start page chosen when the pager was created, null until then. */
-data class MainState(val startPage: Int? = null)
+/**
+ * The main screen's state: the start page chosen when the pager was created, null until then.
+ * [searchOpen] is whether search is open; [searchText] mirrors the search box text, open or not
+ * (a recreated activity restores it before search re-opens).
+ */
+data class MainState(val startPage: Int? = null, val searchOpen: Boolean = false, val searchText: String = "")
