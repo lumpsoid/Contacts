@@ -7,59 +7,41 @@ import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Binder
 import android.os.Process
-import com.google.gson.Gson
 import org.fossify.commons.helpers.LocalContactsHelper
-import org.fossify.commons.helpers.MyContactsContentProvider
 import org.fossify.contacts.extensions.config
+import org.fossify.contacts.helpers.canReadPrivateContacts
 import org.fossify.contacts.helpers.certDigestsOf
 import org.fossify.contacts.helpers.certDigestsOfUid
-import org.fossify.contacts.helpers.isTrustedCaller
 
 class MyContactsContentProvider : ContentProvider() {
     override fun insert(uri: Uri, contentValues: ContentValues?) = null
 
     /** Only this app and apps signed with Fossify's or this app's certificate may read private contacts. */
-    private fun isCallerTrusted(): Boolean {
+    private fun canCallerRead(): Boolean {
         val context = context ?: return false
         val uid = Binder.getCallingUid()
-        if (uid == Process.myUid()) return true
         val packageManager = context.packageManager
-        return isTrustedCaller(packageManager.certDigestsOfUid(uid), packageManager.certDigestsOf(context.packageName))
+        return canReadPrivateContacts(
+            context.config.showPrivateContacts,
+            uid,
+            Process.myUid(),
+            { packageManager.certDigestsOfUid(uid) },
+            { packageManager.certDigestsOf(context.packageName) },
+        )
     }
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor? {
-        if (context == null || !context!!.config.showPrivateContacts || !isCallerTrusted()) {
+        if (context == null || !canCallerRead()) {
             return null
         } else {
-            val matrixCursor = MatrixCursor(
-                arrayOf(
-                    MyContactsContentProvider.COL_RAW_ID,
-                    MyContactsContentProvider.COL_CONTACT_ID,
-                    MyContactsContentProvider.COL_NAME,
-                    MyContactsContentProvider.COL_PHOTO_URI,
-                    MyContactsContentProvider.COL_PHONE_NUMBERS,
-                    MyContactsContentProvider.COL_BIRTHDAYS,
-                    MyContactsContentProvider.COL_ANNIVERSARIES
-                )
-            )
+            val matrixCursor = MatrixCursor(PRIVATE_CONTACT_COLUMNS)
+            val filters = privateContactsQueryOf(selectionArgs)
 
-            val favoritesOnly = selectionArgs?.getOrNull(0)?.equals("1") ?: false
-            val withPhoneNumbersOnly = selectionArgs?.getOrNull(1)?.equals("1") ?: true
-
-            LocalContactsHelper(context!!).getPrivateSimpleContactsSync(favoritesOnly, withPhoneNumbersOnly).forEach {
-                val phoneNumbers = Gson().toJson(it.phoneNumbers)
-                val birthdays = Gson().toJson(it.birthdays)
-                val anniversaries = Gson().toJson(it.anniversaries)
-
-                matrixCursor.newRow()
-                    .add(MyContactsContentProvider.COL_RAW_ID, it.rawId)
-                    .add(MyContactsContentProvider.COL_CONTACT_ID, it.contactId)
-                    .add(MyContactsContentProvider.COL_NAME, it.name)
-                    .add(MyContactsContentProvider.COL_PHOTO_URI, it.photoUri)
-                    .add(MyContactsContentProvider.COL_PHONE_NUMBERS, phoneNumbers)
-                    .add(MyContactsContentProvider.COL_BIRTHDAYS, birthdays)
-                    .add(MyContactsContentProvider.COL_ANNIVERSARIES, anniversaries)
-            }
+            LocalContactsHelper(context!!)
+                .getPrivateSimpleContactsSync(filters.favoritesOnly, filters.withPhoneNumbersOnly)
+                .forEach {
+                    matrixCursor.addRow(privateContactRow(it))
+                }
 
             return matrixCursor
         }
