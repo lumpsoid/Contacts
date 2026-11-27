@@ -1,5 +1,6 @@
 package org.fossify.contacts.helpers
 
+import org.fossify.commons.extensions.ensureTwoDigits
 import org.fossify.commons.helpers.TAB_CONTACTS
 import org.fossify.commons.helpers.TAB_FAVORITES
 import org.fossify.commons.helpers.TAB_GROUPS
@@ -82,8 +83,7 @@ const val THREEMA = "threema"
 
 
 // 6 am is the hardcoded automatic backup time, intervals shorter than 1 day are not yet supported.
-fun getNextAutoBackupTime(): DateTime {
-    val now = DateTime.now()
+fun nextAutoBackupTime(now: DateTime): DateTime {
     val sixHour = now.withHourOfDay(6)
     return if (now.millis < sixHour.millis) {
         sixHour
@@ -92,7 +92,33 @@ fun getNextAutoBackupTime(): DateTime {
     }
 }
 
-fun getPreviousAutoBackupTime(): DateTime {
-    val nextBackupTime = getNextAutoBackupTime()
-    return nextBackupTime.minusDays(AUTO_BACKUP_INTERVAL_IN_DAYS)
+fun previousAutoBackupTime(now: DateTime): DateTime = nextAutoBackupTime(now).minusDays(AUTO_BACKUP_INTERVAL_IN_DAYS)
+
+fun missedAutoBackup(lastBackupMillis: Long, previousScheduledMillis: Long) = lastBackupMillis < previousScheduledMillis
+
+fun autoBackupFileName(template: String, now: DateTime): String {
+    val year = now.year.toString()
+    val month = now.monthOfYear.ensureTwoDigits()
+    val day = now.dayOfMonth.ensureTwoDigits()
+    val hours = now.hourOfDay.ensureTwoDigits()
+    val minutes = now.minuteOfHour.ensureTwoDigits()
+    val seconds = now.secondOfMinute.ensureTwoDigits()
+
+    return template
+        .replace("%Y", year, false)
+        .replace("%M", month, false)
+        .replace("%D", day, false)
+        .replace("%h", hours, false)
+        .replace("%m", minutes, false)
+        .replace("%s", seconds, false)
+}
+
+fun freeBackupFileName(filename: String, isTaken: (String) -> Boolean): String {
+    var name = "$filename.vcf"
+    var num = 0
+    while (isTaken(name)) {
+        num++
+        name = "${filename}_$num.vcf"
+    }
+    return name
 }

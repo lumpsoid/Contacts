@@ -18,8 +18,11 @@ import org.fossify.contacts.R
 import org.fossify.contacts.helpers.AUTOMATIC_BACKUP_REQUEST_CODE
 import org.fossify.contacts.helpers.Config
 import org.fossify.contacts.helpers.VcfExporter
-import org.fossify.contacts.helpers.getNextAutoBackupTime
-import org.fossify.contacts.helpers.getPreviousAutoBackupTime
+import org.fossify.contacts.helpers.autoBackupFileName
+import org.fossify.contacts.helpers.freeBackupFileName
+import org.fossify.contacts.helpers.missedAutoBackup
+import org.fossify.contacts.helpers.nextAutoBackupTime
+import org.fossify.contacts.helpers.previousAutoBackupTime
 import org.fossify.contacts.receivers.AutomaticBackupReceiver
 import org.joda.time.DateTime
 import java.io.File
@@ -49,7 +52,7 @@ fun Context.getAutomaticBackupIntent(): PendingIntent {
 
 fun Context.scheduleNextAutomaticBackup() {
     if (config.autoBackup) {
-        val backupAtMillis = getNextAutoBackupTime().millis
+        val backupAtMillis = nextAutoBackupTime(DateTime.now()).millis
         val pendingIntent = getAutomaticBackupIntent()
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         try {
@@ -70,8 +73,8 @@ fun Context.checkAndBackupContactsOnBoot() {
         // alarms don't survive a reboot or an app update
         scheduleNextAutomaticBackup()
         val previousRealBackupTime = config.lastAutoBackupTime
-        val previousScheduledBackupTime = getPreviousAutoBackupTime().millis
-        val missedPreviousBackup = previousRealBackupTime < previousScheduledBackupTime
+        val previousScheduledBackupTime = previousAutoBackupTime(DateTime.now()).millis
+        val missedPreviousBackup = missedAutoBackup(previousRealBackupTime, previousScheduledBackupTime)
         if (missedPreviousBackup) {
             // device was probably off at the scheduled time so backup now
             backupContacts()
@@ -94,20 +97,7 @@ fun Context.backupContacts() {
 
 
             val now = DateTime.now()
-            val year = now.year.toString()
-            val month = now.monthOfYear.ensureTwoDigits()
-            val day = now.dayOfMonth.ensureTwoDigits()
-            val hours = now.hourOfDay.ensureTwoDigits()
-            val minutes = now.minuteOfHour.ensureTwoDigits()
-            val seconds = now.secondOfMinute.ensureTwoDigits()
-
-            val filename = config.autoBackupFilename
-                .replace("%Y", year, false)
-                .replace("%M", month, false)
-                .replace("%D", day, false)
-                .replace("%h", hours, false)
-                .replace("%m", minutes, false)
-                .replace("%s", seconds, false)
+            val filename = autoBackupFileName(config.autoBackupFilename, now)
 
             val outputFolder = File(config.autoBackupFolder).apply {
                 mkdirs()
@@ -128,12 +118,10 @@ fun Context.backupContacts() {
                     }
                     safStream ?: FileOutputStream(exportFile)
                 } else {
-                    var num = 0
-                    while (getDoesFilePathExist(exportFilePath) && !exportFile.canWrite()) {
-                        num++
-                        exportFile = File(outputFolder, "${filename}_${num}.vcf")
-                        exportFilePath = exportFile.absolutePath
-                    }
+                    exportFile = File(outputFolder, freeBackupFileName(filename) { name ->
+                        File(outputFolder, name).let { getDoesFilePathExist(it.absolutePath) && !it.canWrite() }
+                    })
+                    exportFilePath = exportFile.absolutePath
                     FileOutputStream(exportFile)
                 }
             } catch (e: Exception) {
