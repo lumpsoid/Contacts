@@ -171,8 +171,13 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
   never shut down, so a chain still in flight (delete, then delete the
   linked raws) completes after `onDestroy`. Results come back as
   `runOnUiThread { dispatch(...) }`.
+- A screen whose effects are all `Ui` runs them inline in `dispatch`, in
+  order, with no executor: an async hop would let a lifecycle callback see
+  state the effect was about to change. The executor comes with the
+  screen's first `Load` or `Write` effect.
 - Actions and effects are grouped in nested sealed interfaces
   (`Load`/`Delete`/…, `Ui`/`Load`/`Write`) so each `when` stays under
   detekt's CyclomaticComplexMethod limit.
-- First screen: `screens/viewcontact/` + `ViewContactActivity`, tested
-  in `ViewContactUpdateTest`.
+- Screens on the loop: `screens/viewcontact/` + `ViewContactActivity`
+  (`ViewContactUpdateTest`); `screens/main/` + `MainActivity`, start page
+  and import intent only so far (`MainUpdateTest`).

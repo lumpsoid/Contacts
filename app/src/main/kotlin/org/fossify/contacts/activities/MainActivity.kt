@@ -2,12 +2,12 @@ package org.fossify.contacts.activities
 
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
-import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Icon
 import android.graphics.drawable.LayerDrawable
+import android.net.Uri
 import android.os.Bundle
 import androidx.viewpager.widget.ViewPager
 import me.grantland.widget.AutofitHelper
@@ -37,6 +37,15 @@ import org.fossify.contacts.helpers.ALL_TABS_MASK
 import org.fossify.contacts.helpers.RefreshQueue
 import org.fossify.contacts.helpers.tabsList
 import org.fossify.contacts.interfaces.RefreshContactsListener
+import org.fossify.contacts.screens.main.ImportFacts
+import org.fossify.contacts.screens.main.IntentKind
+import org.fossify.contacts.screens.main.IntentUri
+import org.fossify.contacts.screens.main.MainAction
+import org.fossify.contacts.screens.main.MainEffect
+import org.fossify.contacts.screens.main.MainNotice
+import org.fossify.contacts.screens.main.MainState
+import org.fossify.contacts.screens.main.TabSettings
+import org.fossify.contacts.screens.main.update
 import java.util.Arrays
 
 class MainActivity : SimpleActivity(), RefreshContactsListener {
@@ -53,6 +62,7 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
     override var isSearchBarEnabled = true
 
     private val binding by viewBinding(ActivityMainBinding::inflate)
+    private var mainState = MainState()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -374,33 +384,54 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
             refreshMenuItems()
         }
 
-        handleExternalIntent()
+        dispatch(MainAction.IntentReceived(importFacts()))
         binding.mainDialpadButton.setOnClickListener {
             launchDialpad()
         }
     }
 
-    private fun handleExternalIntent() {
-        val uri = when (intent?.action) {
-            Intent.ACTION_VIEW -> intent.data
-            Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM)
-            else -> null
+    /** The launch intent as plain values. EXTRA_STREAM is read only for ACTION_SEND, as before. */
+    private fun importFacts(): ImportFacts {
+        val kind = when (intent?.action) {
+            Intent.ACTION_VIEW -> IntentKind.VIEW
+            Intent.ACTION_SEND -> IntentKind.SEND
+            else -> IntentKind.OTHER
         }
+        val stream: Uri? = if (kind == IntentKind.SEND) intent.getParcelableExtra(Intent.EXTRA_STREAM) else null
+        return ImportFacts(
+            kind = kind,
+            data = intent?.data?.let { IntentUri(it.toString(), it.scheme) },
+            stream = stream?.let { IntentUri(it.toString(), it.scheme) },
+        )
+    }
 
-        if (uri != null) {
-            // Other apps may only hand us content URIs; a file path would let them read any file we can reach.
-            if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
-                tryImportContactsFromFile(uri) { success ->
-                    if (success) {
-                        runOnUiThread {
-                            refreshContacts(ALL_TABS_MASK)
-                        }
-                    }
-                }
-            } else {
-                toast(org.fossify.commons.R.string.invalid_file_format)
+    // Every main effect is Ui for now, so they run inline on the main thread, in order: the start page is set
+    // before first layout, and the intent is consumed before onResume's second initFragments can read it again.
+    private fun dispatch(action: MainAction) {
+        val next = update(mainState, action)
+        mainState = next.state
+        next.effects.forEach { runEffect(it) }
+    }
+
+    private fun runEffect(effect: MainEffect) {
+        when (effect) {
+            is MainEffect.ShowPage -> {
+                binding.viewPager.currentItem = effect.index
             }
-            intent.action = null
+
+            is MainEffect.ImportFile -> tryImportContactsFromFile(Uri.parse(effect.uri)) { success ->
+                runOnUiThread { dispatch(MainAction.ImportFinished(success)) }
+            }
+
+            MainEffect.ConsumeIntent -> {
+                intent.action = null
+            }
+
+            is MainEffect.Notify -> when (effect.notice) {
+                MainNotice.INVALID_FILE_FORMAT -> toast(org.fossify.commons.R.string.invalid_file_format)
+            }
+
+            MainEffect.RefreshAll -> refreshContacts(ALL_TABS_MASK)
         }
     }
 
@@ -496,7 +527,9 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
 
         if (binding.viewPager.adapter == null) {
             binding.viewPager.adapter = ViewPagerAdapter(this, tabsList, config.showTabs)
-            binding.viewPager.currentItem = getDefaultTab()
+            dispatch(
+                MainAction.PagerCreated(TabSettings(config.defaultTab, config.showTabs, config.lastUsedViewPagerPage))
+            )
         }
 
         getContactsWithNameless { contacts ->
@@ -545,34 +578,6 @@ class MainActivity : SimpleActivity(), RefreshContactsListener {
         findViewById(R.id.favorites_fragment),
         findViewById(R.id.groups_fragment)
     )
-
-    private fun getDefaultTab(): Int {
-        val showTabsMask = config.showTabs
-        return when (config.defaultTab) {
-            TAB_LAST_USED -> config.lastUsedViewPagerPage
-            TAB_CONTACTS -> 0
-            TAB_FAVORITES -> if (showTabsMask and TAB_CONTACTS > 0) 1 else 0
-            else -> {
-                if (showTabsMask and TAB_GROUPS > 0) {
-                    if (showTabsMask and TAB_CONTACTS > 0) {
-                        if (showTabsMask and TAB_FAVORITES > 0) {
-                            2
-                        } else {
-                            1
-                        }
-                    } else {
-                        if (showTabsMask and TAB_FAVORITES > 0) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                } else {
-                    0
-                }
-            }
-        }
-    }
 
     private fun checkWhatsNewDialog() {
         arrayListOf<Release>().apply {
