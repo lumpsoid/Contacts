@@ -100,7 +100,7 @@ android {
     }
 
     testOptions {
-        unitTests.isReturnDefaultValues = true
+        unitTests.isReturnDefaultValues = false
     }
 
     dependenciesInfo {
