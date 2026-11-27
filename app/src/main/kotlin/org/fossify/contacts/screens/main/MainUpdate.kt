@@ -34,18 +34,15 @@ private fun onImport(state: MainState, action: A.Import): MainNext = when (actio
 }
 
 private fun onSearch(state: MainState, action: A.Search): MainNext = when (action) {
-    // Focus can re-open an open search; keep its text.
-    A.SearchOpened -> Next(state.copy(searchText = state.searchText ?: ""))
-    // Closing clears the box after the close, so "" arrives closed; it still filters the page, as before.
-    is A.SearchTextChanged -> Next(
-        if (state.searchText == null) state else state.copy(searchText = action.text),
-        listOf(E.FilterPage(action.text)),
-    )
-    A.SearchClosed -> Next(state.copy(searchText = null), listOf(E.ClearSearch))
+    A.SearchOpened -> Next(state.copy(searchOpen = true))
+    // Every change filters, even closed: commons clears the box just after closing, as upstream forwarded.
+    is A.SearchTextChanged -> Next(state.copy(searchText = action.text), listOf(E.FilterPage(action.text)))
+    A.SearchClosed -> Next(state.copy(searchOpen = false), listOf(E.ClearSearch))
 }
 
-/** An open search filters the page shown and every refreshed list again. */
-private fun refilter(state: MainState): List<E> = state.searchText?.let { listOf(E.FilterPage(it)) } ?: emptyList()
+/** An open search filters the page shown and every refreshed list again, with the box's text. */
+private fun refilter(state: MainState): List<E> =
+    if (state.searchOpen) listOf(E.FilterPage(state.searchText)) else emptyList()
 
 /**
  * The pager index to open on. TAB_LAST_USED reopens the stored page unchecked; a fixed tab opens at its

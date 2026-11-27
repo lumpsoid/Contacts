@@ -14,6 +14,7 @@ data class ImportFacts(val kind: IntentKind, val data: IntentUri?, val stream: I
 
 /**
  * The main screen's state: the start page chosen when the pager was created, null until then.
- * [searchText] is the search box text while search is open, null while closed.
+ * [searchOpen] is whether search is open; [searchText] mirrors the search box text, open or not
+ * (a recreated activity restores it before search re-opens).
  */
-data class MainState(val startPage: Int? = null, val searchText: String? = null)
+data class MainState(val startPage: Int? = null, val searchOpen: Boolean = false, val searchText: String = "")

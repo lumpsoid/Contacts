@@ -9,7 +9,8 @@ import org.fossify.contacts.screens.Next
 import org.fossify.contacts.screens.main.MainAction as A
 import org.fossify.contacts.screens.main.MainEffect as E
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainUpdateTest {
@@ -112,7 +113,7 @@ class MainUpdateTest {
 
     @Test
     fun searchStartsClosed() {
-        assertNull(MainState().searchText)
+        assertFalse(MainState().searchOpen)
         assertEquals(emptyList<E>(), update(MainState(), A.PageSelected).effects)
         assertEquals(emptyList<E>(), update(MainState(), A.ListsRefreshed).effects)
     }
@@ -127,6 +128,13 @@ class MainUpdateTest {
         val next = run(A.SearchOpened, A.SearchTextChanged("ann"))
         assertEquals(listOf(E.FilterPage("ann")), next.effects)
         assertEquals("ann", next.state.searchText)
+        assertTrue(next.state.searchOpen)
+    }
+
+    @Test
+    fun textRestoredBeforeOpenIsUsedOnceOpen() {
+        val next = run(A.SearchTextChanged("ann"), A.SearchOpened, A.PageSelected)
+        assertEquals(listOf(E.FilterPage("ann")), next.effects)
     }
 
     @Test
@@ -138,21 +146,24 @@ class MainUpdateTest {
 
     @Test
     fun reopeningKeepsTheText() {
-        assertEquals("ann", run(A.SearchOpened, A.SearchTextChanged("ann"), A.SearchOpened).state.searchText)
+        val next = run(A.SearchOpened, A.SearchTextChanged("ann"), A.SearchOpened)
+        assertEquals("ann", next.state.searchText)
+        assertTrue(next.state.searchOpen)
     }
 
     @Test
     fun closingClearsAllPages() {
         val next = run(A.SearchOpened, A.SearchTextChanged("ann"), A.SearchClosed)
         assertEquals(listOf(E.ClearSearch), next.effects)
-        assertNull(next.state.searchText)
+        assertFalse(next.state.searchOpen)
     }
 
     @Test
     fun textClearedAfterCloseStillFiltersButLeavesSearchClosed() {
         val next = run(A.SearchOpened, A.SearchClosed, A.SearchTextChanged(""))
         assertEquals(listOf(E.FilterPage("")), next.effects)
-        assertNull(next.state.searchText)
+        assertEquals("", next.state.searchText)
+        assertFalse(next.state.searchOpen)
         assertEquals(emptyList<E>(), update(next.state, A.PageSelected).effects)
     }
 }
