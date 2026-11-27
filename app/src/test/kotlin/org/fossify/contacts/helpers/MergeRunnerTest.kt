@@ -12,6 +12,7 @@ import org.fossify.contacts.models.MergeOutcome
 import org.fossify.contacts.models.MergePlan
 import org.fossify.contacts.models.MergeRecord
 import org.fossify.contacts.models.MergeRunResult
+import org.joda.time.DateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -109,5 +110,10 @@ class MergeRunnerTest {
         )
         assertEquals(1, errors.size)
         assertEquals("boom", errors.single().message)
+    }
+
+    @Test
+    fun theBackupFileNameCarriesTheMinuteOfTheRun() {
+        assertEquals("merge-2026-11-24-1830.vcf", mergeBackupFileName(DateTime(2026, 11, 24, 18, 30)))
     }
 }

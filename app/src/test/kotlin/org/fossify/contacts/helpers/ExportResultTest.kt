@@ -28,4 +28,9 @@ class ExportResultTest {
     fun aFailedWriteWinsOverPartial() {
         assertEquals(VcfExporter.ExportResult.EXPORT_FAIL, exportResult(3, 1, false))
     }
+
+    @Test
+    fun anExportWithNothingExportedIsAFailure() {
+        assertEquals(VcfExporter.ExportResult.EXPORT_FAIL, exportResult(0, 0, true))
+    }
 }

@@ -13,6 +13,7 @@ import org.fossify.commons.models.contacts.Organization
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -162,5 +163,25 @@ class VcardRoundTripTest {
         assertEquals(ImageType.PNG, contact.toVCard(png).photos.first().contentType)
         assertEquals(ImageType.JPEG, contact.toVCard(byteArrayOf(1, 2, 3)).photos.first().contentType)
         assertArrayEquals(png, roundTrip(contact, png).photo)
+    }
+
+    @Test
+    fun aContactWithNoNamePartsStillWritesAnFn() {
+        val contact = Contact(id = 0, contactId = 0, nickname = "Jo", organization = Organization("Acme", ""))
+        assertNotNull(contact.toVCard(null).formattedName)
+        val parsed = roundTrip(contact).contact
+        assertEquals("Acme", parsed.organization.company)
+        assertEquals("Jo", parsed.nickname)
+    }
+
+    @Test
+    fun websiteSurvives() {
+        val contact = Contact(
+            id = 0,
+            contactId = 0,
+            firstName = "Ann",
+            websites = arrayListOf("https://example.com/ann"),
+        )
+        assertEquals(listOf("https://example.com/ann"), roundTrip(contact).contact.websites)
     }
 }
