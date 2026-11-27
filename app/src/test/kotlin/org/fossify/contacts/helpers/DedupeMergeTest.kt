@@ -6,10 +6,14 @@ import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.Event
 import org.fossify.contacts.models.AccountAccess
 import org.fossify.contacts.models.ConflictField
+import org.fossify.contacts.models.ExtraDetails
+import org.fossify.contacts.models.LabeledValue
 import org.fossify.contacts.models.MergeChoices
 import org.fossify.contacts.models.MergeRecord
+import org.fossify.contacts.models.PhoneticName
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -154,5 +158,59 @@ class DedupeMergeTest {
         assertFalse(needsPhotoFile("content://photo", hasBitmap = true, toPrivate = false))
         assertFalse(needsPhotoFile("", hasBitmap = true, toPrivate = true))
         assertFalse(needsPhotoFile("", hasBitmap = false, toPrivate = false))
+    }
+
+    private fun extrasRecord(id: Int, name: String, extras: ExtraDetails?) = MergeRecord(
+        Contact(id = id, contactId = id, firstName = name, source = "acc"),
+        "com.google",
+        AccountAccess.WRITABLE,
+        extras
+    )
+
+    @Test
+    fun mergedExtrasHoldEverySipAddressAndRelationOnce() {
+        val first = extrasRecord(
+            1,
+            "Ann",
+            ExtraDetails(
+                sipAddresses = listOf(LabeledValue("ann@sip.example", 1, "")),
+                relations = listOf(LabeledValue("Bob", 1, ""))
+            )
+        )
+        val second = extrasRecord(
+            2,
+            "Ann",
+            ExtraDetails(
+                sipAddresses = listOf(LabeledValue("ANN@sip.example", 1, "")),
+                relations = listOf(LabeledValue("Eve", 2, ""))
+            )
+        )
+        val merged = buildMergedExtras(listOf(first, second), MergeChoices())
+        assertEquals(listOf(LabeledValue("ann@sip.example", 1, "")), merged?.sipAddresses)
+        assertEquals(listOf(LabeledValue("Bob", 1, ""), LabeledValue("Eve", 2, "")), merged?.relations)
+    }
+
+    @Test
+    fun mergedExtrasTakeThePhoneticNameOfTheNameHolder() {
+        val first = extrasRecord(1, "Anna", ExtraDetails(phoneticName = PhoneticName(given = "Ana")))
+        val second = extrasRecord(2, "Anne", ExtraDetails(phoneticName = PhoneticName(given = "An")))
+        val choices = MergeChoices().pick(ConflictField.NAME, second.key)
+        val merged = buildMergedExtras(listOf(first, second), choices)
+        assertEquals("An", merged?.phoneticName?.given)
+    }
+
+    @Test
+    fun mergedExtrasFallBackToTheFirstPhoneticName() {
+        val first = extrasRecord(1, "Anna", ExtraDetails())
+        val second = extrasRecord(2, "Anne", ExtraDetails(phoneticName = PhoneticName(given = "An")))
+        val merged = buildMergedExtras(listOf(first, second), MergeChoices())
+        assertEquals("An", merged?.phoneticName?.given)
+    }
+
+    @Test
+    fun mergedExtrasAreNullWhenOneRecordsAreUnknown() {
+        val known = extrasRecord(1, "Ann", ExtraDetails())
+        val unknown = extrasRecord(2, "Ann", null)
+        assertNull(buildMergedExtras(listOf(known, unknown), MergeChoices()))
     }
 }

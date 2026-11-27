@@ -3,8 +3,16 @@ package org.fossify.contacts.models
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.ContactSource
 
-/** One stored contact record (a device raw contact or a private contact) with its account type and access. */
-data class MergeRecord(val contact: Contact, val accountType: String, val access: AccountAccess) {
+/**
+ * One stored contact record (a device raw contact or a private contact) with its account type and access.
+ * [extras] null: they could not be read.
+ */
+data class MergeRecord(
+    val contact: Contact,
+    val accountType: String,
+    val access: AccountAccess,
+    val extras: ExtraDetails? = ExtraDetails()
+) {
     /** Unique over device and private records. */
     val key: String get() = "${contact.source}:${contact.id}"
 

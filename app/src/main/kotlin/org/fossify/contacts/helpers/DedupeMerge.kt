@@ -5,8 +5,10 @@ import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.commons.models.contacts.Organization
 import org.fossify.contacts.models.ConflictField
+import org.fossify.contacts.models.ExtraDetails
 import org.fossify.contacts.models.MergeChoices
 import org.fossify.contacts.models.MergeRecord
+import org.fossify.contacts.models.PhoneticName
 
 /** The value of [field] in [record], blank when the record has none. */
 fun conflictValue(record: MergeRecord, field: ConflictField): String {
@@ -86,6 +88,23 @@ fun buildMergedContact(base: Contact, records: List<MergeRecord>, choices: Merge
         organization = organizationFrom?.organization?.copy() ?: Organization("", ""),
         starred = contacts.maxOfOrNull { it.starred } ?: 0,
         ringtone = contacts.map { it.ringtone }.firstOrNull { !it.isNullOrBlank() } ?: base.ringtone
+    )
+}
+
+/**
+ * The extra details of [records] on one record: the SIP addresses and relations of all of them, each once, and
+ * the phonetic name of the name's holder, else the first one. Null when the details of one could not be read.
+ */
+fun buildMergedExtras(records: List<MergeRecord>, choices: MergeChoices): ExtraDetails? {
+    val all = records.map { it.extras ?: return null }
+    val ofNameHolder = holderOf(ConflictField.NAME, records, choices)?.extras?.phoneticName
+    val phonetic = ofNameHolder?.takeIf { !it.isEmpty() }
+        ?: all.map { it.phoneticName }.firstOrNull { !it.isEmpty() }
+        ?: PhoneticName()
+    return ExtraDetails(
+        all.flatMap { it.sipAddresses }.distinctBy { it.key },
+        all.flatMap { it.relations }.distinctBy { it.key },
+        phonetic
     )
 }
 
