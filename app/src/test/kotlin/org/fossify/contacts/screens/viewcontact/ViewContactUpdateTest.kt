@@ -279,4 +279,52 @@ class ViewContactUpdateTest {
         assertEquals(listOf(E.SaveProviderRingtone(7, "")), next.effects)
         assertNull(next.state.contact?.ringtone)
     }
+
+    @Test
+    fun aViewIntentWithAnIdLoadsTheIdNotTheUri() {
+        val lookup = intent(contactId = 7, isView = true, data = IntentData.LOOKUP)
+        val asked = update(ViewContactState(), A.Resumed(lookup))
+        assertEquals(listOf(E.RequestReadPermission), asked.effects)
+
+        val next = update(asked.state, A.PermissionResult(true))
+        assertEquals(listOf(E.LoadContact(7, false)), next.effects)
+    }
+
+    @Test
+    fun editingASourceSuppressesTheLoadErrorToast() {
+        val edited = update(ViewContactState(contact = device()), A.EditSourceClicked(device()))
+        assertTrue(edited.state.wasEditLaunched)
+
+        val loaded = update(edited.state, A.ContactLoaded(null))
+        assertEquals(listOf(E.Finish), loaded.effects)
+    }
+
+    @Test
+    fun visibleFieldsChangedReloadsTheIntent() {
+        val resumed = update(ViewContactState(), A.Resumed(intent(contactId = 7)))
+        assertEquals(listOf(E.LoadContact(7, false)), resumed.effects)
+
+        val next = update(resumed.state, A.VisibleFieldsChanged)
+        assertEquals(listOf(E.LoadContact(7, false)), next.effects)
+    }
+
+    @Test
+    fun nothingLoadsWithoutAnIntent() {
+        val granted = update(ViewContactState(), A.PermissionResult(true))
+        assertEquals(emptyList<E>(), granted.effects)
+
+        val visible = update(ViewContactState(), A.VisibleFieldsChanged)
+        assertEquals(emptyList<E>(), visible.effects)
+    }
+
+    @Test
+    fun detailsNeedAContact() {
+        val favorite = update(ViewContactState(), A.FavoriteToggled)
+        assertEquals(emptyList<E>(), favorite.effects)
+        assertNull(favorite.state.contact)
+
+        val ringtone = update(ViewContactState(), A.RingtonePicked("a.ogg"))
+        assertEquals(emptyList<E>(), ringtone.effects)
+        assertNull(ringtone.state.contact)
+    }
 }
