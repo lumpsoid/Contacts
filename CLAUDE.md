@@ -154,3 +154,25 @@ Meta: `<track>-meta` · Status: **todo | in progress | done (<date>)** · Commit
   test wants.
 - No build runs on the Pi: the gate is `agent-ci` on a work branch
   (fork-ci.yml: unit tests, detekt, lint, assembleFossDebug).
+
+## Screens
+
+- A screen's decisions go through a loop in `screens/<screen>/`:
+  `<Screen>State` (data class), `<Screen>Action` (sealed: user events and
+  load results), `<Screen>Effect` (sealed: loads, writes, UI) and a pure
+  `update(state, action): Next<State, Effect>` in `<Screen>Update.kt`
+  (`screens/Next.kt`). No `android.*` imports there. Config values, ids,
+  time and permission results enter as Action payloads.
+- The Activity is the shell: it maps view events to Actions, renders
+  state and runs effects. `dispatch` runs on the main thread only. One
+  single-worker executor per screen runs each dispatch's effects in list
+  order, posting UI effects to the main thread from it, so a `Finish`
+  after a write runs after the write. Its idle thread times out and it is
+  never shut down, so a chain still in flight (delete, then delete the
+  linked raws) completes after `onDestroy`. Results come back as
+  `runOnUiThread { dispatch(...) }`.
+- Actions and effects are grouped in nested sealed interfaces
+  (`Load`/`Delete`/…, `Ui`/`Load`/`Write`) so each `when` stays under
+  detekt's CyclomaticComplexMethod limit.
+- First screen: `screens/viewcontact/` + `ViewContactActivity`, tested
+  in `ViewContactUpdateTest`.

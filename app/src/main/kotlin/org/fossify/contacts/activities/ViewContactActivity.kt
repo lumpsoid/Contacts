@@ -30,22 +30,35 @@ import org.fossify.contacts.dialogs.ManageVisibleFieldsDialog
 import org.fossify.contacts.extensions.*
 import org.fossify.contacts.helpers.*
 import org.fossify.contacts.models.TransferMode
+import org.fossify.contacts.screens.viewcontact.IntentData
+import org.fossify.contacts.screens.viewcontact.IntentFacts
+import org.fossify.contacts.screens.viewcontact.ViewContactAction
+import org.fossify.contacts.screens.viewcontact.ViewContactEffect
+import org.fossify.contacts.screens.viewcontact.ViewContactNotice
+import org.fossify.contacts.screens.viewcontact.ViewContactState
+import org.fossify.contacts.screens.viewcontact.update
 import java.util.Locale
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class ViewContactActivity : ContactActivity() {
-    private var isViewIntent = false
-    private var wasEditLaunched = false
     private var duplicateContacts = ArrayList<Contact>()
     private var contactSources = ArrayList<ContactSource>()
     private var showFields = 0
-    private var fullContact: Contact? = null    // contact with all fields filled from duplicates
     private var duplicateInitialized = false
-    private var linkedRawContactIds = listOf<Int>()
+    private var state = ViewContactState()
+    // One worker and a FIFO queue keep effects in order; the idle thread times out, so the executor is never shut
+    // down and a chain still in flight (delete, then delete the linked raws) completes after onDestroy.
+    private val effectRunner = ThreadPoolExecutor(
+        1, 1, EFFECT_THREAD_IDLE_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue()
+    ).apply { allowCoreThreadTimeOut(true) }
     private val mergeDuplicate: Boolean get() = config.mergeDuplicateContacts
     private val binding by viewBinding(ActivityViewContactBinding::inflate)
 
     companion object {
         private const val COMPARABLE_PHONE_NUMBER_LENGTH = 9
+        private const val EFFECT_THREAD_IDLE_SECONDS = 30L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,23 +77,27 @@ class ViewContactActivity : ContactActivity() {
 
     override fun onResume() {
         super.onResume()
-        isViewIntent = intent.action == ContactsContract.QuickContact.ACTION_QUICK_CONTACT || intent.action == Intent.ACTION_VIEW
-        if (isViewIntent) {
-            handlePermission(PERMISSION_READ_CONTACTS) {
-                if (it) {
-                    ensureBackgroundThread {
-                        initContact()
-                    }
-                } else {
-                    toast(org.fossify.commons.R.string.no_contacts_permission)
-                    finish()
-                }
-            }
-        } else {
-            ensureBackgroundThread {
-                initContact()
-            }
+        dispatch(ViewContactAction.Resumed(intentFacts()))
+    }
+
+    private fun intentFacts(): IntentFacts {
+        val contactId = try {
+            intent.getIntExtra(CONTACT_ID, 0)
+        } catch (e: Exception) {
+            null
         }
+        val data = intent.data
+        return IntentFacts(
+            contactId = contactId,
+            isPrivate = intent.getBooleanExtra(IS_PRIVATE, false),
+            isViewIntent = intent.action == ContactsContract.QuickContact.ACTION_QUICK_CONTACT ||
+                intent.action == Intent.ACTION_VIEW,
+            data = when {
+                data == null -> IntentData.NONE
+                data.path?.contains("lookup") == true -> IntentData.LOOKUP
+                else -> IntentData.CONTACT
+            }
+        )
     }
 
     override fun onBackPressedCompat(): Boolean {
@@ -95,50 +112,44 @@ class ViewContactActivity : ContactActivity() {
     private fun setupMenu() {
         binding.contactToolbar.menu.apply {
             findItem(R.id.share).setOnMenuItemClickListener {
-                if (fullContact != null) {
-                    shareContact(fullContact!!)
-                }
+                dispatch(ViewContactAction.ShareClicked)
                 true
             }
 
             findItem(R.id.edit).setOnMenuItemClickListener {
-                if (contact != null) {
-                    launchEditContact(contact!!, false)
-                }
+                dispatch(ViewContactAction.EditClicked(config.mergeDuplicateContacts))
                 true
             }
 
             findItem(R.id.open_with).setOnMenuItemClickListener {
-                openWith()
+                dispatch(ViewContactAction.OpenWithClicked)
                 true
             }
 
             findItem(R.id.delete).setOnMenuItemClickListener {
-                deleteContactWithMergeLogic()
+                dispatch(ViewContactAction.DeleteClicked(binding.contactSourcesHolder.childCount, mergeDuplicate))
                 true
             }
 
             findItem(R.id.unlink).setOnMenuItemClickListener {
-                unlinkContact()
+                dispatch(ViewContactAction.UnlinkClicked)
                 true
             }
 
             findItem(R.id.move_to_account).setOnMenuItemClickListener {
-                contact?.let { transferContacts(listOf(it), TransferMode.MOVE) { done -> if (done > 0) finish() } }
+                dispatch(ViewContactAction.TransferClicked(TransferMode.MOVE))
                 true
             }
 
             findItem(R.id.copy_to_account).setOnMenuItemClickListener {
-                contact?.let { transferContacts(listOf(it), TransferMode.COPY) {} }
+                dispatch(ViewContactAction.TransferClicked(TransferMode.COPY))
                 true
             }
 
             findItem(R.id.manage_visible_fields).setOnMenuItemClickListener {
                 ManageVisibleFieldsDialog(this@ViewContactActivity) {
                     showFields = config.showContactFields
-                    ensureBackgroundThread {
-                        initContact()
-                    }
+                    dispatch(ViewContactAction.VisibleFieldsChanged)
                 }
                 true
             }
@@ -146,62 +157,6 @@ class ViewContactActivity : ContactActivity() {
 
         binding.contactToolbar.setNavigationOnClickListener {
             finish()
-        }
-    }
-
-    private fun initContact() {
-        var wasLookupKeyUsed = false
-        var contactId: Int
-        try {
-            contactId = intent.getIntExtra(CONTACT_ID, 0)
-        } catch (e: Exception) {
-            return
-        }
-
-        if (contactId == 0 && isViewIntent) {
-            val data = intent.data
-            if (data != null) {
-                val rawId = if (data.path?.contains("lookup") == true) {
-                    val lookupKey = getLookupKeyFromUri(data)
-                    if (lookupKey != null) {
-                        contact = ContactsHelper(this).getContactWithLookupKey(lookupKey)
-                        fullContact = contact
-                        wasLookupKeyUsed = contact != null
-                    }
-
-                    getLookupUriRawId(data)
-                } else {
-                    getContactUriRawId(data)
-                }
-
-                if (rawId != -1) {
-                    contactId = rawId
-                }
-            }
-        }
-
-        if (contactId != 0 && !wasLookupKeyUsed) {
-            contact = getContactWithIdOrRaw(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
-            fullContact = contact
-
-            if (contact == null) {
-                if (!wasEditLaunched) {
-                    toast(org.fossify.commons.R.string.unknown_error_occurred)
-                }
-                finish()
-            } else {
-                runOnUiThread {
-                    gotContact()
-                }
-            }
-        } else {
-            if (contact == null) {
-                finish()
-            } else {
-                runOnUiThread {
-                    gotContact()
-                }
-            }
         }
     }
 
@@ -258,8 +213,6 @@ class ViewContactActivity : ContactActivity() {
         binding.contactSendEmail.setOnLongClickListener { toast(org.fossify.commons.R.string.send_email); true; }
 
         updateTextColors(binding.contactScrollview)
-        binding.contactToolbar.menu.findItem(R.id.open_with).isVisible = contact?.isPrivate() == false
-        updateUnlinkVisibility()
     }
 
     private fun setupViewContact() {
@@ -299,54 +252,126 @@ class ViewContactActivity : ContactActivity() {
         updateTextColors(binding.contactScrollview)
     }
 
-    private fun launchEditContact(contact: Contact, editExactContact: Boolean) {
-        wasEditLaunched = true
-        duplicateInitialized = false
-        if (editExactContact) {
-            editContact(contact)
-        } else {
-            editContact(contact, config.mergeDuplicateContacts)
+    private fun dispatch(action: ViewContactAction) {
+        val next = update(state, action)
+        state = next.state
+        contact = state.contact
+        renderMenu()
+        if (next.effects.isNotEmpty()) {
+            effectRunner.execute { next.effects.forEach { runEffect(it) } }
         }
     }
 
-    private fun openWith() {
-        if (contact != null) {
-            val uri = getContactPublicUri(contact!!)
-            launchViewContactIntent(uri)
+    private fun post(action: ViewContactAction) = runOnUiThread { dispatch(action) }
+
+    private fun renderMenu() {
+        binding.contactToolbar.menu.apply {
+            findItem(R.id.open_with).isVisible = state.showOpenWith
+            findItem(R.id.unlink).isVisible = state.showUnlink
         }
     }
 
-    private fun updateUnlinkVisibility() {
-        val currentContact = contact
-        if (currentContact == null || currentContact.isPrivate() || currentContact.contactId == 0) {
-            linkedRawContactIds = emptyList()
-            binding.contactToolbar.menu.findItem(R.id.unlink).isVisible = false
-            return
+    private fun runEffect(effect: ViewContactEffect) {
+        when (effect) {
+            is ViewContactEffect.Ui -> runOnUiThread { runUi(effect) }
+            is ViewContactEffect.Load -> runLoad(effect)
+            is ViewContactEffect.Write -> runWrite(effect)
         }
+    }
 
-        ensureBackgroundThread {
-            val ids = ContactLinkHelper(this).getLinkedRawContactIds(currentContact.contactId)
-            runOnUiThread {
-                linkedRawContactIds = ids
-                binding.contactToolbar.menu.findItem(R.id.unlink).isVisible = ids.size > 1
+    private fun runUi(effect: ViewContactEffect.Ui) {
+        when (effect) {
+            ViewContactEffect.RequestReadPermission ->
+                handlePermission(PERMISSION_READ_CONTACTS) { post(ViewContactAction.PermissionResult(it)) }
+
+            ViewContactEffect.ShowContact -> gotContact()
+            is ViewContactEffect.Notify -> toast(noticeText(effect.notice))
+            ViewContactEffect.Finish -> finish()
+            is ViewContactEffect.ConfirmDelete -> confirmDelete(effect.fromAllSources)
+            is ViewContactEffect.Share -> shareContact(effect.contact)
+            is ViewContactEffect.Edit -> {
+                duplicateInitialized = false
+                editContact(effect.contact, effect.isMergedDuplicate)
             }
+
+            is ViewContactEffect.EditExact -> {
+                duplicateInitialized = false
+                editContact(effect.contact)
+            }
+
+            is ViewContactEffect.OpenWith -> launchViewContactIntent(getContactPublicUri(effect.contact))
+            is ViewContactEffect.Transfer ->
+                transferContacts(listOf(effect.contact), effect.mode) { done ->
+                    post(ViewContactAction.Transferred(effect.mode, done))
+                }
         }
     }
 
-    private fun unlinkContact() {
-        val ids = linkedRawContactIds
-        if (ids.size < 2) {
-            return
-        }
+    private fun noticeText(notice: ViewContactNotice): Int = when (notice) {
+        ViewContactNotice.UNKNOWN_ERROR -> org.fossify.commons.R.string.unknown_error_occurred
+        ViewContactNotice.NO_CONTACTS_PERMISSION -> org.fossify.commons.R.string.no_contacts_permission
+        ViewContactNotice.CONTACTS_UNLINKED -> R.string.contacts_unlinked
+    }
 
-        ensureBackgroundThread {
-            val unlinked = ContactLinkHelper(this).unlinkRawContacts(ids)
-            runOnUiThread {
-                if (unlinked) {
-                    toast(R.string.contacts_unlinked)
-                    finish()
+    private fun runLoad(effect: ViewContactEffect.Load) {
+        when (effect) {
+            ViewContactEffect.ResolveLookupUri -> resolveLookupUri()
+            ViewContactEffect.ResolveContactUri ->
+                intent.data?.let { post(ViewContactAction.UriResolved(getContactUriRawId(it))) }
+
+            is ViewContactEffect.LoadContact ->
+                post(ViewContactAction.ContactLoaded(getContactWithIdOrRaw(effect.id, effect.isPrivate)))
+
+            is ViewContactEffect.LoadLinkedRawIds -> {
+                val ids = ContactLinkHelper(this).getLinkedRawContactIds(effect.contactId)
+                post(ViewContactAction.LinkedRawIdsLoaded(ids))
+            }
+
+            is ViewContactEffect.LoadMergedDeleteScope -> {
+                // read the links first: they are gone once the contact is deleted
+                val linked = ContactLinkHelper(this).getLinkedRawContactIdsOf(listOf(effect.contact))
+                getDuplicatesKeptTogether(effect.contact, true) {
+                    post(ViewContactAction.MergedDeleteScopeLoaded(it, linked))
                 }
             }
+        }
+    }
+
+    private fun resolveLookupUri() {
+        val data = intent.data ?: return
+        val lookupKey = getLookupKeyFromUri(data)
+        val rawId = getLookupUriRawId(data)
+        if (lookupKey == null) {
+            post(ViewContactAction.UriResolved(rawId))
+        } else {
+            post(ViewContactAction.LookupResolved(ContactsHelper(this).getContactWithLookupKey(lookupKey), rawId))
+        }
+    }
+
+    private fun runWrite(effect: ViewContactEffect.Write) {
+        when (effect) {
+            is ViewContactEffect.DeleteMerged -> {
+                val ok = ContactsHelper(this).deleteContacts(ArrayList(effect.contacts))
+                post(ViewContactAction.MergedDeleted(ok, effect.linkedRawIds))
+            }
+
+            is ViewContactEffect.DeleteSingle ->
+                ContactsHelper(this).deleteContact(effect.contact, false) { post(ViewContactAction.SingleDeleted) }
+
+            is ViewContactEffect.DeleteRawContacts -> {
+                ContactLinkHelper(this).deleteRawContacts(effect.rawIds)
+            }
+
+            is ViewContactEffect.Unlink ->
+                post(ViewContactAction.Unlinked(ContactLinkHelper(this).unlinkRawContacts(effect.rawIds)))
+
+            is ViewContactEffect.AddFavorite -> ContactsHelper(this).addFavorites(arrayListOf(effect.contact))
+            is ViewContactEffect.RemoveFavorite -> ContactsHelper(this).removeFavorites(arrayListOf(effect.contact))
+            is ViewContactEffect.SaveLocalRingtone ->
+                LocalContactsHelper(this).updateRingtone(effect.contactId, effect.path)
+
+            is ViewContactEffect.SaveProviderRingtone ->
+                ContactsHelper(this).updateRingtone(effect.contactId.toString(), effect.path)
         }
     }
 
@@ -357,16 +382,7 @@ class ViewContactActivity : ContactActivity() {
             setImageDrawable(getStarDrawable(tag == 1))
 
             setOnClickListener {
-                val newIsStarred = if (tag == 1) 0 else 1
-                ensureBackgroundThread {
-                    val contacts = arrayListOf(contact!!)
-                    if (newIsStarred == 1) {
-                        ContactsHelper(context).addFavorites(contacts)
-                    } else {
-                        ContactsHelper(context).removeFavorites(contacts)
-                    }
-                }
-                contact!!.starred = newIsStarred
+                dispatch(ViewContactAction.FavoriteToggled)
                 tag = contact!!.starred
                 setImageDrawable(getStarDrawable(tag == 1))
             }
@@ -429,7 +445,7 @@ class ViewContactActivity : ContactActivity() {
         }.toMutableSet() as LinkedHashSet<PhoneNumber>
 
         phoneNumbers = phoneNumbers.sortedBy { it.type }.toMutableSet() as LinkedHashSet<PhoneNumber>
-        fullContact!!.phoneNumbers = phoneNumbers.toMutableList() as ArrayList<PhoneNumber>
+        contact!!.phoneNumbers = phoneNumbers.toMutableList() as ArrayList<PhoneNumber>
         binding.contactNumbersHolder.removeAllViews()
 
         if (phoneNumbers.isNotEmpty() && showFields and SHOW_PHONE_NUMBERS_FIELD != 0) {
@@ -508,7 +524,7 @@ class ViewContactActivity : ContactActivity() {
         }
 
         addresses = addresses.sortedBy { it.type }.toMutableSet() as LinkedHashSet<Address>
-        fullContact!!.addresses = addresses.toMutableList() as ArrayList<Address>
+        contact!!.addresses = addresses.toMutableList() as ArrayList<Address>
         binding.contactAddressesHolder.removeAllViews()
 
         if (addresses.isNotEmpty() && showFields and SHOW_ADDRESSES_FIELD != 0) {
@@ -543,7 +559,7 @@ class ViewContactActivity : ContactActivity() {
         }
 
         IMs = IMs.sortedBy { it.type }.toMutableSet() as LinkedHashSet<IM>
-        fullContact!!.IMs = IMs.toMutableList() as ArrayList<IM>
+        contact!!.IMs = IMs.toMutableList() as ArrayList<IM>
         binding.contactImsHolder.removeAllViews()
 
         if (IMs.isNotEmpty() && showFields and SHOW_IMS_FIELD != 0) {
@@ -574,7 +590,7 @@ class ViewContactActivity : ContactActivity() {
         }
 
         events = events.sortedBy { it.type }.toMutableSet() as LinkedHashSet<Event>
-        fullContact!!.events = events.toMutableList() as ArrayList<Event>
+        contact!!.events = events.toMutableList() as ArrayList<Event>
         binding.contactEventsHolder.removeAllViews()
 
         if (events.isNotEmpty() && showFields and SHOW_EVENTS_FIELD != 0) {
@@ -604,7 +620,7 @@ class ViewContactActivity : ContactActivity() {
         }
 
         websites = websites.sorted().toMutableSet() as LinkedHashSet<String>
-        fullContact!!.websites = websites.toMutableList() as ArrayList<String>
+        contact!!.websites = websites.toMutableList() as ArrayList<String>
         binding.contactWebsitesHolder.removeAllViews()
 
         if (websites.isNotEmpty() && showFields and SHOW_WEBSITES_FIELD != 0) {
@@ -638,7 +654,7 @@ class ViewContactActivity : ContactActivity() {
         }
 
         groups = groups.sortedBy { it.title }.toMutableSet() as LinkedHashSet<Group>
-        fullContact!!.groups = groups.toMutableList() as ArrayList<Group>
+        contact!!.groups = groups.toMutableList() as ArrayList<Group>
         binding.contactGroupsHolder.removeAllViews()
 
         if (groups.isNotEmpty() && showFields and SHOW_GROUPS_FIELD != 0) {
@@ -681,7 +697,7 @@ class ViewContactActivity : ContactActivity() {
                     binding.contactSourcesHolder.addView(root)
 
                     contactSource.setOnClickListener {
-                        launchEditContact(key, true)
+                        dispatch(ViewContactAction.EditSourceClicked(key))
                     }
 
                     if (value.lowercase(Locale.getDefault()) == WHATSAPP) {
@@ -863,15 +879,7 @@ class ViewContactActivity : ContactActivity() {
     }
 
     private fun ringtoneUpdated(path: String?) {
-        contact!!.ringtone = path
-
-        ensureBackgroundThread {
-            if (contact!!.isPrivate()) {
-                LocalContactsHelper(this).updateRingtone(contact!!.contactId, path ?: "")
-            } else {
-                ContactsHelper(this).updateRingtone(contact!!.contactId.toString(), path ?: "")
-            }
-        }
+        dispatch(ViewContactAction.RingtonePicked(path))
     }
 
     private fun initializeDuplicateContacts(callback: () -> Unit) {
@@ -883,43 +891,11 @@ class ViewContactActivity : ContactActivity() {
         }
     }
 
-    private fun deleteWithDuplicates(contactToDelete: Contact, callback: () -> Unit) {
-        if (mergeDuplicate) {
-            getDuplicatesKeptTogether(contactToDelete, true) { contacts ->
-                if (ContactsHelper(this).deleteContacts(contacts)) {
-                    callback()
-                }
-            }
-        } else {
-            ContactsHelper(this).deleteContact(contactToDelete, false) { callback() }
-        }
-    }
-
-    private fun deleteContactWithMergeLogic() {
-        val addition = if (binding.contactSourcesHolder.childCount > 1 && mergeDuplicate) {
-            "\n\n${getString(R.string.delete_from_all_sources)}"
-        } else {
-            ""
-        }
-
+    private fun confirmDelete(fromAllSources: Boolean) {
+        val addition = if (fromAllSources) "\n\n${getString(R.string.delete_from_all_sources)}" else ""
         val message = "${getString(org.fossify.commons.R.string.proceed_with_deletion)}$addition"
         ConfirmationDialog(this, message) {
-            if (contact != null) {
-                val contactToDelete = contact!!
-                ensureBackgroundThread {
-                    val linkHelper = ContactLinkHelper(this)
-                    val linkedRawIds = if (mergeDuplicate) {
-                        linkHelper.getLinkedRawContactIdsOf(listOf(contactToDelete))
-                    } else {
-                        emptyList()
-                    }
-
-                    deleteWithDuplicates(contactToDelete) {
-                        linkHelper.deleteRawContacts(linkedRawIds)
-                        finish()
-                    }
-                }
-            }
+            dispatch(ViewContactAction.DeleteConfirmed(mergeDuplicate))
         }
     }
 
