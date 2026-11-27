@@ -61,7 +61,7 @@ class ExtraDetailsStore(private val context: Context) {
         ) + listOfNotNull(rawId?.toString())
         return try {
             context.contentResolver.query(Data.CONTENT_URI, projection, selection, selectionArgs.toTypedArray(), null)
-                ?.use { readDetails(it) }
+                ?.use { extraDetailsOf(rowsOf(it)) }
         } catch (e: SecurityException) {
             context.showErrorToast(e)
             null
@@ -77,44 +77,24 @@ class ExtraDetailsStore(private val context: Context) {
         }
     }
 
-    private fun readDetails(cursor: Cursor): Map<Int, ExtraDetails> {
-        val sip = HashMap<Int, ArrayList<LabeledValue>>()
-        val relations = HashMap<Int, ArrayList<LabeledValue>>()
-        val phonetic = HashMap<Int, PhoneticName>()
+    /** Every row of [cursor] as an [ExtraDetailRow]; the phonetic columns are null on rows that have none. */
+    private fun rowsOf(cursor: Cursor): List<ExtraDetailRow> {
+        val rows = ArrayList<ExtraDetailRow>()
         while (cursor.moveToNext()) {
-            val rawId = cursor.getIntValue(Data.RAW_CONTACT_ID)
-            when (cursor.getStringValue(Data.MIMETYPE)) {
-                StructuredName.CONTENT_ITEM_TYPE -> {
-                    if (phonetic[rawId]?.isEmpty() ?: true) phonetic[rawId] = phoneticOf(cursor)
-                }
-                SipAddress.CONTENT_ITEM_TYPE -> addLabeled(sip, rawId, cursor)
-                Relation.CONTENT_ITEM_TYPE -> addLabeled(relations, rawId, cursor)
-            }
+            rows.add(
+                ExtraDetailRow(
+                    rawId = cursor.getIntValue(Data.RAW_CONTACT_ID),
+                    mimetype = cursor.getStringValue(Data.MIMETYPE),
+                    data1 = cursor.getStringValue(Data.DATA1),
+                    data2 = cursor.getIntValue(Data.DATA2),
+                    data3 = cursor.getStringValue(Data.DATA3),
+                    phoneticGiven = cursor.getStringValue(StructuredName.PHONETIC_GIVEN_NAME),
+                    phoneticMiddle = cursor.getStringValue(StructuredName.PHONETIC_MIDDLE_NAME),
+                    phoneticFamily = cursor.getStringValue(StructuredName.PHONETIC_FAMILY_NAME)
+                )
+            )
         }
-        return (sip.keys + relations.keys + phonetic.keys)
-            .associateWith { rawId ->
-                ExtraDetails(sip[rawId].orEmpty(), relations[rawId].orEmpty(), phonetic[rawId] ?: PhoneticName())
-            }
-            .filterValues { !it.isEmpty() }
-    }
-
-    private fun phoneticOf(cursor: Cursor) = PhoneticName(
-        cursor.getStringValue(StructuredName.PHONETIC_GIVEN_NAME) ?: "",
-        cursor.getStringValue(StructuredName.PHONETIC_MIDDLE_NAME) ?: "",
-        cursor.getStringValue(StructuredName.PHONETIC_FAMILY_NAME) ?: ""
-    )
-
-    /** Appends the SIP address or relation of the current row to [lists] under [rawId], when it has a value. */
-    private fun addLabeled(lists: HashMap<Int, ArrayList<LabeledValue>>, rawId: Int, cursor: Cursor) {
-        val value = labeledValue(cursor) ?: return
-        lists.getOrPut(rawId) { ArrayList() }.add(value)
-    }
-
-    /** The SIP address or relation of the current row; null when its value is null or blank. */
-    private fun labeledValue(cursor: Cursor): LabeledValue? {
-        val value = cursor.getStringValue(Data.DATA1)
-        if (value.isNullOrBlank()) return null
-        return LabeledValue(value, cursor.getIntValue(Data.DATA2), cursor.getStringValue(Data.DATA3) ?: "")
+        return rows
     }
 
     /** Writes [missing] to raw contact [rawId]; false when the provider refused. */
@@ -173,4 +153,56 @@ class ExtraDetailsStore(private val context: Context) {
         values.put(Data.MIMETYPE, StructuredName.CONTENT_ITEM_TYPE)
         return context.contentResolver.insert(Data.CONTENT_URI, values) != null
     }
+}
+
+/** The cursor values of one row of the [ExtraDetailsStore] query, as plain values. */
+data class ExtraDetailRow(
+    val rawId: Int,
+    val mimetype: String?,
+    val data1: String?,
+    val data2: Int,
+    val data3: String?,
+    val phoneticGiven: String?,
+    val phoneticMiddle: String?,
+    val phoneticFamily: String?
+)
+
+/** The [ExtraDetails] of each raw contact in [rows] that has any, by raw id. */
+fun extraDetailsOf(rows: List<ExtraDetailRow>): Map<Int, ExtraDetails> {
+    val sip = HashMap<Int, ArrayList<LabeledValue>>()
+    val relations = HashMap<Int, ArrayList<LabeledValue>>()
+    val phonetic = HashMap<Int, PhoneticName>()
+    for (row in rows) {
+        when (row.mimetype) {
+            StructuredName.CONTENT_ITEM_TYPE -> {
+                if (phonetic[row.rawId]?.isEmpty() ?: true) phonetic[row.rawId] = phoneticOf(row)
+            }
+            SipAddress.CONTENT_ITEM_TYPE -> addLabeled(sip, row)
+            Relation.CONTENT_ITEM_TYPE -> addLabeled(relations, row)
+        }
+    }
+    return (sip.keys + relations.keys + phonetic.keys)
+        .associateWith { rawId ->
+            ExtraDetails(sip[rawId].orEmpty(), relations[rawId].orEmpty(), phonetic[rawId] ?: PhoneticName())
+        }
+        .filterValues { !it.isEmpty() }
+}
+
+private fun phoneticOf(row: ExtraDetailRow) = PhoneticName(
+    row.phoneticGiven ?: "",
+    row.phoneticMiddle ?: "",
+    row.phoneticFamily ?: ""
+)
+
+/** Appends the SIP address or relation of [row] to [lists] under its raw id, when it has a value. */
+private fun addLabeled(lists: HashMap<Int, ArrayList<LabeledValue>>, row: ExtraDetailRow) {
+    val value = labeledValue(row) ?: return
+    lists.getOrPut(row.rawId) { ArrayList() }.add(value)
+}
+
+/** The SIP address or relation of [row]; null when its value is null or blank. */
+private fun labeledValue(row: ExtraDetailRow): LabeledValue? {
+    val value = row.data1
+    if (value.isNullOrBlank()) return null
+    return LabeledValue(value, row.data2, row.data3 ?: "")
 }
