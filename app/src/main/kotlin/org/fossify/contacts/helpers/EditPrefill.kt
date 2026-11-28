@@ -16,12 +16,10 @@ import org.fossify.commons.models.contacts.Organization
 typealias IntentRow = Map<String, Any?>
 
 /**
- * What a third-party intent asks the edit screen to prefill, read from its extras: the KEY_PHONE extra
- * ([hasPhoneExtra] when the key is present, even with a null value), KEY_EMAIL, KEY_NAME as text, and the
- * "data" list's [rows].
+ * What a third-party intent asks the edit screen to prefill, read from its extras: the KEY_PHONE extra,
+ * KEY_EMAIL, KEY_NAME as text, and the "data" list's [rows].
  */
 data class Prefill(
-    val hasPhoneExtra: Boolean = false,
     val phoneExtra: String? = null,
     val email: String? = null,
     val name: String? = null,
@@ -32,7 +30,7 @@ data class Prefill(
 data class Prefilled(val contact: Contact, val highlightNumber: Boolean, val highlightEmail: Boolean)
 
 /**
- * Adds what the intent carries to a copy of [contact]: the phone, the email, the name as first name, then each
+ * Adds what the intent carries to a copy of [contact]: the phones, the email, the name as first name, then each
  * data row by mimetype. A non-empty phone is highlighted only when [addingNumber] (ADD_NEW_CONTACT_NUMBER).
  */
 fun Prefill.applyTo(contact: Contact, addingNumber: Boolean, normalize: (String) -> String): Prefilled {
@@ -43,10 +41,8 @@ fun Prefill.applyTo(contact: Contact, addingNumber: Boolean, normalize: (String)
         events = ArrayList(contact.events),
         websites = ArrayList(contact.websites),
     )
-    val phone = phone()
-    if (phone != null) {
-        filled.phoneNumbers.add(PhoneNumber(phone, DEFAULT_PHONE_NUMBER_TYPE, "", normalize(phone)))
-    }
+    val phones = phones()
+    phones.forEach { filled.phoneNumbers.add(PhoneNumber(it, DEFAULT_PHONE_NUMBER_TYPE, "", normalize(it))) }
     if (email != null) {
         filled.emails.add(Email(email, DEFAULT_EMAIL_TYPE, ""))
     }
@@ -54,12 +50,19 @@ fun Prefill.applyTo(contact: Contact, addingNumber: Boolean, normalize: (String)
         filled.firstName = name
     }
     rows.forEach { filled.addRow(it) }
-    return Prefilled(filled, highlightNumber = addingNumber && !phone.isNullOrEmpty(), highlightEmail = email != null)
+    return Prefilled(
+        filled,
+        highlightNumber = addingNumber && phones.any { it.isNotEmpty() },
+        highlightEmail = email != null,
+    )
 }
 
-/** KEY_PHONE when present; otherwise the first data row's data1, whatever its mimetype. */
-private fun Prefill.phone(): String? =
-    if (hasPhoneExtra) phoneExtra else rows.firstOrNull()?.let { stringOf(it, "data1") }
+/** The KEY_PHONE extra, then every phone row's number, each once. */
+private fun Prefill.phones(): List<String> =
+    (listOfNotNull(phoneExtra) + rows
+        .filter { it[CommonDataKinds.StructuredName.MIMETYPE] == CommonDataKinds.Phone.CONTENT_ITEM_TYPE }
+        .mapNotNull { stringOf(it, CommonDataKinds.Phone.DATA1) })
+        .distinct()
 
 /** Applies one data row as its mimetype's parse rule does; a row whose value is missing adds nothing. */
 private fun Contact.addRow(row: IntentRow) {

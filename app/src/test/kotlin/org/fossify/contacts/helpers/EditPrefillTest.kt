@@ -24,7 +24,7 @@ class EditPrefillTest {
 
     @Test
     fun phoneExtraIsAddedNormalised() {
-        val result = Prefill(hasPhoneExtra = true, phoneExtra = "0903 123").applyTo(empty, false, normalize)
+        val result = Prefill(phoneExtra = "0903 123").applyTo(empty, false, normalize)
         assertEquals(
             listOf(PhoneNumber("0903 123", DEFAULT_PHONE_NUMBER_TYPE, "", "0903123")),
             result.contact.phoneNumbers,
@@ -32,7 +32,7 @@ class EditPrefillTest {
     }
 
     @Test
-    fun withoutExtraTheFirstRowData1IsThePhone() {
+    fun phoneRowWithoutExtraIsAdded() {
         val prefill = Prefill(
             rows = listOf(row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "+123 456")),
         )
@@ -44,21 +44,54 @@ class EditPrefillTest {
     }
 
     @Test
-    fun phoneExtraKeyWithNullValueAddsNoPhone() {
-        val prefill = Prefill(
-            hasPhoneExtra = true,
-            phoneExtra = null,
-            rows = listOf(row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "1")),
-        )
-        val result = prefill.applyTo(empty, false, normalize)
+    fun firstRowEmailIsNotAPhone() {
+        val result = Prefill(
+            rows = listOf(row(CommonDataKinds.Email.CONTENT_ITEM_TYPE, CommonDataKinds.Email.DATA1 to "a@b")),
+        ).applyTo(empty, false, normalize)
         assertTrue(result.contact.phoneNumbers.isEmpty())
+        assertEquals(listOf(Email("a@b", DEFAULT_EMAIL_TYPE, "")), result.contact.emails)
+    }
+
+    @Test
+    fun everyPhoneRowIsAdded() {
+        val result = Prefill(
+            rows = listOf(
+                row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "1"),
+                row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "2"),
+            ),
+        ).applyTo(empty, false, normalize)
+        assertEquals(
+            listOf(
+                PhoneNumber("1", DEFAULT_PHONE_NUMBER_TYPE, "", "1"),
+                PhoneNumber("2", DEFAULT_PHONE_NUMBER_TYPE, "", "2"),
+            ),
+            result.contact.phoneNumbers,
+        )
+    }
+
+    @Test
+    fun extraAndRowsAreJoinedOnce() {
+        val result = Prefill(
+            phoneExtra = "1",
+            rows = listOf(
+                row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "1"),
+                row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "3"),
+            ),
+        ).applyTo(empty, false, normalize)
+        assertEquals(
+            listOf(
+                PhoneNumber("1", DEFAULT_PHONE_NUMBER_TYPE, "", "1"),
+                PhoneNumber("3", DEFAULT_PHONE_NUMBER_TYPE, "", "3"),
+            ),
+            result.contact.phoneNumbers,
+        )
     }
 
     @Test
     fun addingNumberHighlightsANonEmptyPhone() {
-        assertTrue(Prefill(hasPhoneExtra = true, phoneExtra = "1").applyTo(empty, true, normalize).highlightNumber)
-        assertFalse(Prefill(hasPhoneExtra = true, phoneExtra = "").applyTo(empty, true, normalize).highlightNumber)
-        assertFalse(Prefill(hasPhoneExtra = true, phoneExtra = "1").applyTo(empty, false, normalize).highlightNumber)
+        assertTrue(Prefill(phoneExtra = "1").applyTo(empty, true, normalize).highlightNumber)
+        assertFalse(Prefill(phoneExtra = "").applyTo(empty, true, normalize).highlightNumber)
+        assertFalse(Prefill(phoneExtra = "1").applyTo(empty, false, normalize).highlightNumber)
     }
 
     @Test
@@ -211,7 +244,7 @@ class EditPrefillTest {
             contactId = 3,
             emails = arrayListOf(Email("o@p", DEFAULT_EMAIL_TYPE, "")),
         )
-        val result = Prefill(email = "a@b", hasPhoneExtra = true, phoneExtra = "1").applyTo(base, false, normalize)
+        val result = Prefill(email = "a@b", phoneExtra = "1").applyTo(base, false, normalize)
         assertEquals(1, base.emails.size)
         assertTrue(base.phoneNumbers.isEmpty())
         assertEquals(2, result.contact.emails.size)

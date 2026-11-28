@@ -228,7 +228,6 @@ class EditContactActivity : ContactActivity() {
     }
 
     private fun prefillOf(extras: Bundle) = Prefill(
-        hasPhoneExtra = extras.containsKey(KEY_PHONE),
         phoneExtra = intent.getStringExtra(KEY_PHONE),
         email = intent.getStringExtra(KEY_EMAIL),
         name = extras.get(KEY_NAME)?.toString(),
