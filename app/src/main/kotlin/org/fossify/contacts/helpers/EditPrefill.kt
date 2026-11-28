@@ -96,7 +96,7 @@ private fun Contact.addRow(row: IntentRow) {
     }
 }
 
-/** The address row, or null when it has neither a formatted nor a plain value. */
+/** The address row: its street (DATA4), else its formatted address (DATA1); null when it has neither. */
 private fun addressOf(row: IntentRow): Address? {
     val value = stringOf(row, CommonDataKinds.StructuredPostal.DATA4)
         ?: stringOf(row, CommonDataKinds.StructuredPostal.DATA1)

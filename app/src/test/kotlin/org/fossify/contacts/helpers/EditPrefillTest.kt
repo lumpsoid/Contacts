@@ -151,12 +151,13 @@ class EditPrefillTest {
     }
 
     @Test
-    fun addressRowPrefersFormattedAddressData4() {
+    fun addressRowPrefersStreetOverFormattedAddress() {
         val prefill = Prefill(
             rows = listOf(
                 row(
                     CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE,
                     CommonDataKinds.StructuredPostal.DATA1 to "one",
+                    // DATA4 is STREET; upstream takes it as the address value
                     CommonDataKinds.StructuredPostal.DATA4 to "four",
                     CommonDataKinds.StructuredPostal.DATA2 to CommonDataKinds.StructuredPostal.TYPE_WORK,
                     CommonDataKinds.StructuredPostal.COUNTRY to "c",
@@ -164,7 +165,6 @@ class EditPrefillTest {
                     CommonDataKinds.StructuredPostal.CITY to "ci",
                     CommonDataKinds.StructuredPostal.POSTCODE to "pc",
                     CommonDataKinds.StructuredPostal.POBOX to "pb",
-                    CommonDataKinds.StructuredPostal.STREET to "st",
                     CommonDataKinds.StructuredPostal.NEIGHBORHOOD to "nb",
                 ),
             ),
@@ -172,7 +172,9 @@ class EditPrefillTest {
         val result = prefill.applyTo(empty, false, normalize)
         assertEquals(
             listOf(
-                Address("four", CommonDataKinds.StructuredPostal.TYPE_WORK, "", "c", "r", "ci", "pc", "pb", "st", "nb"),
+                Address(
+                    "four", CommonDataKinds.StructuredPostal.TYPE_WORK, "", "c", "r", "ci", "pc", "pb", "four", "nb",
+                ),
             ),
             result.contact.addresses,
         )
