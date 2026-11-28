@@ -13,11 +13,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.provider.ContactsContract.CommonDataKinds
 import android.provider.ContactsContract.CommonDataKinds.Im
-import android.provider.ContactsContract.CommonDataKinds.Note
 import android.provider.ContactsContract.CommonDataKinds.Phone
-import android.provider.ContactsContract.CommonDataKinds.StructuredName
 import android.provider.ContactsContract.CommonDataKinds.StructuredPostal
-import android.provider.ContactsContract.CommonDataKinds.Website
 import android.provider.MediaStore
 import android.telephony.PhoneNumberUtils
 import android.view.WindowManager
@@ -69,6 +66,7 @@ import org.fossify.commons.helpers.DEFAULT_EVENT_TYPE
 import org.fossify.commons.helpers.DEFAULT_IM_TYPE
 import org.fossify.commons.helpers.DEFAULT_PHONE_NUMBER_TYPE
 import org.fossify.commons.helpers.IS_PRIVATE
+import org.fossify.commons.helpers.KEY_PHONE
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.PERMISSION_WRITE_CONTACTS
 import org.fossify.commons.helpers.PHOTO_ADDED
@@ -98,12 +96,8 @@ import org.fossify.commons.helpers.SMT_PRIVATE
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.RadioItem
-import org.fossify.commons.models.contacts.Address
 import org.fossify.commons.models.contacts.Contact
-import org.fossify.commons.models.contacts.Email
-import org.fossify.commons.models.contacts.Event
 import org.fossify.commons.models.contacts.Group
-import org.fossify.commons.models.contacts.Organization
 import org.fossify.commons.views.MyAutoCompleteTextView
 import org.fossify.contacts.R
 import org.fossify.contacts.adapters.AutoCompleteTextViewAdapter
@@ -139,18 +133,27 @@ import org.fossify.contacts.helpers.KEY_NAME
 import org.fossify.contacts.helpers.NumberRow
 import org.fossify.contacts.helpers.PHONE_TYPE_LABELS
 import org.fossify.contacts.helpers.PlainAddress
+import org.fossify.contacts.helpers.Prefill
 import org.fossify.contacts.helpers.RawContactLoader
 import org.fossify.contacts.helpers.StructuredAddress
 import org.fossify.contacts.helpers.TypeLabels
 import org.fossify.contacts.helpers.TypedRow
+import org.fossify.contacts.helpers.applyTo
 import org.fossify.contacts.helpers.streetForStructuredEdit
 import org.fossify.contacts.helpers.typeIdOf
 import org.fossify.contacts.screens.editcontact.BackFacts
 import org.fossify.contacts.screens.editcontact.EditContactAction
 import org.fossify.contacts.screens.editcontact.EditContactEffect
+import org.fossify.contacts.screens.editcontact.EditContactNotice
 import org.fossify.contacts.screens.editcontact.EditContactState
 import org.fossify.contacts.screens.editcontact.LeaveVia
+import org.fossify.contacts.screens.editcontact.OpenFacts
+import org.fossify.contacts.screens.editcontact.OpenKind
+import org.fossify.contacts.screens.editcontact.OpenUri
 import org.fossify.contacts.screens.editcontact.update
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class EditContactActivity : ContactActivity() {
     companion object {
@@ -164,13 +167,18 @@ class EditContactActivity : ContactActivity() {
         private const val REMOVE_PHOTO = 3
 
         private const val AUTO_COMPLETE_DELAY = 5000L
+        private const val EFFECT_THREAD_IDLE_SECONDS = 30L
     }
 
     private var editState = EditContactState()
+    // One worker and a FIFO queue keep effects in order; the idle thread times out, so the executor is never shut
+    // down and a chain still in flight (delete, then delete the linked raws) completes after onDestroy.
+    private val effectRunner = ThreadPoolExecutor(
+        1, 1, EFFECT_THREAD_IDLE_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue()
+    ).apply { allowCoreThreadTimeOut(true) }
     private var wasActivityInitialized = false
     private var lastPhotoIntentUri: Uri? = null
     private var isSaving = false
-    private var isThirdPartyIntent = false
     private var highlightLastPhoneNumber = false
     private var highlightLastEmail = false
     private var numberViewToColor: EditText? = null
@@ -196,31 +204,37 @@ class EditContactActivity : ContactActivity() {
         )
         setupMenu()
 
-        val action = intent.action
-        isThirdPartyIntent = action == Intent.ACTION_EDIT || action == Intent.ACTION_INSERT || action == ADD_NEW_CONTACT_NUMBER
-        val isFromSimpleContacts = intent.getBooleanExtra(IS_FROM_SIMPLE_CONTACTS, false)
-        if (isThirdPartyIntent && !isFromSimpleContacts) {
-            handlePermission(PERMISSION_READ_CONTACTS) {
-                if (it) {
-                    handlePermission(PERMISSION_WRITE_CONTACTS) {
-                        if (it) {
-                            initContact()
-                        } else {
-                            toast(org.fossify.commons.R.string.no_contacts_permission)
-                            hideKeyboard()
-                            finish()
-                        }
-                    }
-                } else {
-                    toast(org.fossify.commons.R.string.no_contacts_permission)
-                    hideKeyboard()
-                    finish()
-                }
-            }
-        } else {
-            initContact()
-        }
+        dispatch(EditContactAction.Opened(openFacts()))
     }
+
+    /** The launch intent as plain values; each ContentValues of the "data" extra becomes a plain map. */
+    private fun openFacts(): OpenFacts {
+        val kind = when (intent.action) {
+            Intent.ACTION_EDIT -> OpenKind.EDIT
+            Intent.ACTION_INSERT -> OpenKind.INSERT
+            ADD_NEW_CONTACT_NUMBER -> OpenKind.ADD_NUMBER
+            else -> OpenKind.OTHER
+        }
+        val data = intent.data
+        val path = data?.path
+        return OpenFacts(
+            kind = kind,
+            fromSimpleContacts = intent.getBooleanExtra(IS_FROM_SIMPLE_CONTACTS, false),
+            contactId = intent.getIntExtra(CONTACT_ID, 0),
+            isPrivate = intent.getBooleanExtra(IS_PRIVATE, false),
+            data = if (data != null && path != null) OpenUri(path, data.pathSegments.lastOrNull().orEmpty()) else null,
+            prefill = intent.extras?.let { prefillOf(it) },
+        )
+    }
+
+    private fun prefillOf(extras: Bundle) = Prefill(
+        hasPhoneExtra = extras.containsKey(KEY_PHONE),
+        phoneExtra = intent.getStringExtra(KEY_PHONE),
+        email = intent.getStringExtra(KEY_EMAIL),
+        name = extras.get(KEY_NAME)?.toString(),
+        rows = extras.getParcelableArrayList<ContentValues>("data").orEmpty()
+            .map { values -> values.keySet().associateWith { values.get(it) } },
+    )
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
@@ -239,49 +253,8 @@ class EditContactActivity : ContactActivity() {
         lastPhotoIntentUri?.let { outState.putString(LAST_PHOTO_INTENT_URI, it.toString()) }
     }
 
-    private fun initContact() {
-        var contactId = intent.getIntExtra(CONTACT_ID, 0)
-        val action = intent.action
-        if (contactId == 0 && (action == Intent.ACTION_EDIT || action == ADD_NEW_CONTACT_NUMBER)) {
-            val data = intent.data
-            if (data != null && data.path != null) {
-                val rawId = if (data.path!!.contains("lookup")) {
-                    if (data.pathSegments.last().startsWith("local_")) {
-                        data.path!!.substringAfter("local_").toIntOrNull() ?: -1
-                    } else {
-                        getLookupUriRawId(data)
-                    }
-                } else {
-                    getContactUriRawId(data)
-                }
-
-                if (rawId != -1) {
-                    contactId = rawId
-                }
-            }
-        }
-
-        if (contactId != 0) {
-            ensureBackgroundThread {
-                contact = getContactWithIdOrRaw(contactId, intent.getBooleanExtra(IS_PRIVATE, false))
-                if (contact == null) {
-                    runOnUiThread {
-                        toast(org.fossify.commons.R.string.unknown_error_occurred)
-                        hideKeyboard()
-                        finish()
-                    }
-                } else {
-                    runOnUiThread {
-                        gotContact()
-                    }
-                }
-            }
-        } else {
-            gotContact()
-        }
-    }
-
-    private fun gotContact() {
+    private fun gotContact(loaded: Contact?, prefill: Prefill?, addingNumber: Boolean) {
+        contact = loaded
         binding.contactScrollview.beVisible()
         if (contact == null) {
             setupNewContact()
@@ -290,32 +263,11 @@ class EditContactActivity : ContactActivity() {
             originalRingtone = contact?.ringtone
         }
 
-        val action = intent.action
-        if (((contact!!.id == 0 && action == Intent.ACTION_INSERT) || action == ADD_NEW_CONTACT_NUMBER) && intent.extras != null) {
-            val phoneNumber = getPhoneNumberFromIntent(intent)
-            if (phoneNumber != null) {
-                contact!!.phoneNumbers.add(PhoneNumber(phoneNumber, DEFAULT_PHONE_NUMBER_TYPE, "", phoneNumber.normalizePhoneNumber()))
-                if (phoneNumber.isNotEmpty() && action == ADD_NEW_CONTACT_NUMBER) {
-                    highlightLastPhoneNumber = true
-                }
-            }
-
-            val email = intent.getStringExtra(KEY_EMAIL)
-            if (email != null) {
-                val newEmail = Email(email, DEFAULT_EMAIL_TYPE, "")
-                contact!!.emails.add(newEmail)
-                highlightLastEmail = true
-            }
-
-            val firstName = intent.extras!!.get(KEY_NAME)
-            if (firstName != null) {
-                contact!!.firstName = firstName.toString()
-            }
-
-            val data = intent.extras!!.getParcelableArrayList<ContentValues>("data")
-            if (data != null) {
-                parseIntentData(data)
-            }
+        if (prefill != null) {
+            val filled = prefill.applyTo(contact!!, addingNumber) { it.normalizePhoneNumber() }
+            contact = filled.contact
+            highlightLastPhoneNumber = filled.highlightNumber
+            highlightLastEmail = filled.highlightEmail
             setupEditContact()
         }
 
@@ -417,14 +369,24 @@ class EditContactActivity : ContactActivity() {
         dispatch(EditContactAction.LeaveRequested(via, facts, System.currentTimeMillis()))
     }
 
-    // Every edit effect is Ui for now, so they run inline on the main thread, in order.
     private fun dispatch(action: EditContactAction) {
         val next = update(editState, action)
         editState = next.state
-        next.effects.forEach { runEffect(it) }
+        if (next.effects.isNotEmpty()) {
+            effectRunner.execute { next.effects.forEach { runEffect(it) } }
+        }
     }
 
+    private fun post(action: EditContactAction) = runOnUiThread { dispatch(action) }
+
     private fun runEffect(effect: EditContactEffect) {
+        when (effect) {
+            is EditContactEffect.Ui -> runOnUiThread { runUi(effect) }
+            is EditContactEffect.Load -> runLoad(effect)
+        }
+    }
+
+    private fun runUi(effect: EditContactEffect.Ui) {
         when (effect) {
             is EditContactEffect.AskToSave -> ConfirmationAdvancedDialog(
                 activity = this,
@@ -436,6 +398,41 @@ class EditContactActivity : ContactActivity() {
 
             is EditContactEffect.Exit -> leave(effect.via)
             EditContactEffect.Save -> saveContact()
+            EditContactEffect.AskContactsPermission -> askContactsPermission()
+            is EditContactEffect.Notify -> toast(noticeText(effect.notice))
+            EditContactEffect.Close -> {
+                hideKeyboard()
+                finish()
+            }
+
+            is EditContactEffect.ShowContact -> gotContact(effect.contact, effect.prefill, effect.addingNumber)
+        }
+    }
+
+    private fun runLoad(effect: EditContactEffect.Load) {
+        when (effect) {
+            EditContactEffect.ResolveLookupUri ->
+                intent.data?.let { post(EditContactAction.UriResolved(getLookupUriRawId(it))) }
+            EditContactEffect.ResolveContactUri ->
+                intent.data?.let { post(EditContactAction.UriResolved(getContactUriRawId(it))) }
+            is EditContactEffect.LoadContact ->
+                post(EditContactAction.ContactLoaded(getContactWithIdOrRaw(effect.id, effect.isPrivate)))
+        }
+    }
+
+    private fun noticeText(notice: EditContactNotice): Int = when (notice) {
+        EditContactNotice.UNKNOWN_ERROR -> org.fossify.commons.R.string.unknown_error_occurred
+        EditContactNotice.NO_CONTACTS_PERMISSION -> org.fossify.commons.R.string.no_contacts_permission
+    }
+
+    /** Read first, then write; refusing either answers false. */
+    private fun askContactsPermission() {
+        handlePermission(PERMISSION_READ_CONTACTS) { read ->
+            if (read) {
+                handlePermission(PERMISSION_WRITE_CONTACTS) { dispatch(EditContactAction.PermissionAnswered(it)) }
+            } else {
+                dispatch(EditContactAction.PermissionAnswered(false))
+            }
         }
     }
 
@@ -1594,64 +1591,6 @@ class EditContactActivity : ContactActivity() {
                 }
             }
         }
-    }
-
-    private fun parseIntentData(data: ArrayList<ContentValues>) {
-        data.forEach {
-            when (it.get(StructuredName.MIMETYPE)) {
-                CommonDataKinds.Email.CONTENT_ITEM_TYPE -> parseEmail(it)
-                StructuredPostal.CONTENT_ITEM_TYPE -> parseAddress(it)
-                CommonDataKinds.Organization.CONTENT_ITEM_TYPE -> parseOrganization(it)
-                CommonDataKinds.Event.CONTENT_ITEM_TYPE -> parseEvent(it)
-                Website.CONTENT_ITEM_TYPE -> parseWebsite(it)
-                Note.CONTENT_ITEM_TYPE -> parseNote(it)
-            }
-        }
-    }
-
-    private fun parseEmail(contentValues: ContentValues) {
-        val type = contentValues.getAsInteger(CommonDataKinds.Email.DATA2) ?: DEFAULT_EMAIL_TYPE
-        val emailValue = contentValues.getAsString(CommonDataKinds.Email.DATA1) ?: return
-        val email = Email(emailValue, type, "")
-        contact!!.emails.add(email)
-    }
-
-    private fun parseAddress(contentValues: ContentValues) {
-        val type = contentValues.getAsInteger(StructuredPostal.DATA2) ?: DEFAULT_ADDRESS_TYPE
-        val addressValue = contentValues.getAsString(StructuredPostal.DATA4)
-                ?: contentValues.getAsString(StructuredPostal.DATA1) ?: return
-        val country = contentValues.getAsString(StructuredPostal.COUNTRY)
-        val region = contentValues.getAsString(StructuredPostal.REGION)
-        val city = contentValues.getAsString(StructuredPostal.CITY)
-        val postcode = contentValues.getAsString(StructuredPostal.POSTCODE)
-        val pobox = contentValues.getAsString(StructuredPostal.POBOX)
-        val street = contentValues.getAsString(StructuredPostal.STREET)
-        val neighborhood = contentValues.getAsString(StructuredPostal.NEIGHBORHOOD)
-        val address = Address(addressValue, type, "", country, region, city, postcode, pobox, street, neighborhood)
-        contact!!.addresses.add(address)
-    }
-
-    private fun parseOrganization(contentValues: ContentValues) {
-        val company = contentValues.getAsString(CommonDataKinds.Organization.DATA1) ?: ""
-        val jobPosition = contentValues.getAsString(CommonDataKinds.Organization.DATA4) ?: ""
-        contact!!.organization = Organization(company, jobPosition)
-    }
-
-    private fun parseEvent(contentValues: ContentValues) {
-        val type = contentValues.getAsInteger(CommonDataKinds.Event.DATA2) ?: DEFAULT_EVENT_TYPE
-        val eventValue = contentValues.getAsString(CommonDataKinds.Event.DATA1) ?: return
-        val event = Event(eventValue, type)
-        contact!!.events.add(event)
-    }
-
-    private fun parseWebsite(contentValues: ContentValues) {
-        val website = contentValues.getAsString(Website.DATA1) ?: return
-        contact!!.websites.add(website)
-    }
-
-    private fun parseNote(contentValues: ContentValues) {
-        val note = contentValues.getAsString(Note.DATA1) ?: return
-        contact!!.notes = note
     }
 
     private fun startTakePhotoIntent() {
