@@ -113,11 +113,9 @@ class EditContactUpdateTest {
     }
 
     @Test
-    fun noContactPromptsOnlyForARingtone() {
-        val noRingtone = facts(saved = null, form = null, ringtone = null)
-        val withRingtone = facts(saved = null, form = null, ringtone = "r")
-        assertEquals(listOf(E.Exit(LeaveVia.BACK)), leave(noRingtone).effects)
-        assertEquals(listOf(E.AskToSave(LeaveVia.BACK)), leave(withRingtone).effects)
+    fun noContactNeverPrompts() {
+        assertEquals(listOf(E.Exit(LeaveVia.BACK)), leave(facts(saved = null, form = null, ringtone = null)).effects)
+        assertEquals(listOf(E.Exit(LeaveVia.BACK)), leave(facts(saved = null, form = null, ringtone = "r")).effects)
     }
 
     @Test

@@ -10,11 +10,8 @@ enum class LeaveVia { BACK, TOOLBAR }
  * the form would save ([form], null when [saved] is), and the ringtone the contact was loaded with.
  */
 data class BackFacts(val saving: Boolean, val saved: Contact?, val form: Contact?, val originalRingtone: String?) {
-    /**
-     * Unsaved changes: the form differs from the contact, or the ringtone changed. With no contact yet,
-     * only the ringtone counts.
-     */
-    val changed: Boolean get() = saved != null && saved != form || originalRingtone != saved?.ringtone
+    /** Unsaved changes: the form differs from the contact, or the ringtone changed. No contact, nothing to save. */
+    val changed: Boolean get() = saved != null && (saved != form || originalRingtone != saved.ringtone)
 }
 
 /** The edit screen's state: when the save prompt was last shown, so a quick second back leaves. */
