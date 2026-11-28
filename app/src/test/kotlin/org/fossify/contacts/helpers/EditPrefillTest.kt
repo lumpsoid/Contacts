@@ -95,6 +95,27 @@ class EditPrefillTest {
     }
 
     @Test
+    fun rowPhoneIsHighlightedWhenAddingNumber() {
+        val prefill = Prefill(
+            rows = listOf(row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "1")),
+        )
+        assertTrue(prefill.applyTo(empty, true, normalize).highlightNumber)
+        assertFalse(prefill.applyTo(empty, false, normalize).highlightNumber)
+    }
+
+    @Test
+    fun phoneRowWithoutNumberIsSkipped() {
+        val result = Prefill(
+            rows = listOf(
+                row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE),
+                row(CommonDataKinds.Phone.CONTENT_ITEM_TYPE, CommonDataKinds.Phone.DATA1 to "2"),
+            ),
+        ).applyTo(empty, true, normalize)
+        assertEquals(listOf(PhoneNumber("2", DEFAULT_PHONE_NUMBER_TYPE, "", "2")), result.contact.phoneNumbers)
+        assertTrue(result.highlightNumber)
+    }
+
+    @Test
     fun emailExtraIsAddedAndHighlighted() {
         val result = Prefill(email = "a@b").applyTo(empty, false, normalize)
         assertEquals(listOf(Email("a@b", DEFAULT_EMAIL_TYPE, "")), result.contact.emails)
