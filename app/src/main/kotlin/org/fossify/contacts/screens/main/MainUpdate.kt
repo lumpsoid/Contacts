@@ -49,18 +49,14 @@ private fun refilter(state: MainState): List<E> =
 
 /**
  * The pager index to open on. TAB_LAST_USED reopens the stored page, or the first when it is past the shown
- * tabs; a fixed tab opens at its index among the shown tabs, and any value settings doesn't offer acts as groups.
+ * tabs. A fixed tab opens at its index among the shown tabs, or the first page when it is hidden; any value
+ * settings doesn't offer acts as groups.
  */
 private fun startPage(tabs: TabSettings): Int {
-    fun shown(tab: Int) = (tabs.showTabs and tab) > 0
-    val shownCount = TAB_ORDER.count { shown(it) }
-    return when (tabs.defaultTab) {
-        TAB_LAST_USED -> tabs.lastUsedPage.takeIf { it in 0 until shownCount } ?: 0
-        TAB_CONTACTS -> 0
-        // Index 1 whenever contacts is shown, even with favourites hidden, as upstream does.
-        TAB_FAVORITES -> if (shown(TAB_CONTACTS)) 1 else 0
-        else -> if (shown(TAB_GROUPS)) listOf(TAB_CONTACTS, TAB_FAVORITES).count { shown(it) } else 0
-    }
+    val shown = TAB_ORDER.filter { (tabs.showTabs and it) > 0 }
+    if (tabs.defaultTab == TAB_LAST_USED) return tabs.lastUsedPage.takeIf { it in shown.indices } ?: 0
+    val tab = tabs.defaultTab.takeIf { it in TAB_ORDER } ?: TAB_GROUPS
+    return shown.indexOf(tab).coerceAtLeast(0)
 }
 
 /** VIEW imports its data, SEND its stream; only a content uri is read, anything else is refused. */

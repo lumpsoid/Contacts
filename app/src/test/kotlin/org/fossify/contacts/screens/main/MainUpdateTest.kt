@@ -53,7 +53,12 @@ class MainUpdateTest {
     @Test
     fun favouritesOpensSecondWhenContactsIsShown() {
         assertEquals(listOf(E.ShowPage(1)), page(TAB_FAVORITES).effects)
-        assertEquals(listOf(E.ShowPage(1)), page(TAB_FAVORITES, showTabs = TAB_CONTACTS or TAB_GROUPS).effects)
+    }
+
+    @Test
+    fun hiddenDefaultTabOpensTheFirstPage() {
+        assertEquals(listOf(E.ShowPage(0)), page(TAB_FAVORITES, showTabs = noFavourites).effects)
+        assertEquals(listOf(E.ShowPage(0)), page(TAB_CONTACTS, showTabs = TAB_FAVORITES or TAB_GROUPS).effects)
     }
 
     @Test
