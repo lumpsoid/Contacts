@@ -64,7 +64,10 @@ private fun Prefill.phones(): List<String> =
         .mapNotNull { stringOf(it, CommonDataKinds.Phone.DATA1) })
         .distinct()
 
-/** Applies one data row as its mimetype's parse rule does; a row whose value is missing adds nothing. */
+/**
+ * Adds one list row (email, address, event, website) as its mimetype's parse rule does; a row whose value is
+ * missing adds nothing. Other rows go to [setField].
+ */
 private fun Contact.addRow(row: IntentRow) {
     when (row[CommonDataKinds.StructuredName.MIMETYPE]) {
         CommonDataKinds.Email.CONTENT_ITEM_TYPE -> {
@@ -75,12 +78,6 @@ private fun Contact.addRow(row: IntentRow) {
         CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE -> {
             addressOf(row)?.let { addresses.add(it) }
         }
-        CommonDataKinds.Organization.CONTENT_ITEM_TYPE -> {
-            organization = Organization(
-                stringOf(row, CommonDataKinds.Organization.DATA1) ?: "",
-                stringOf(row, CommonDataKinds.Organization.DATA4) ?: "",
-            )
-        }
         CommonDataKinds.Event.CONTENT_ITEM_TYPE -> {
             stringOf(row, CommonDataKinds.Event.DATA1)?.let {
                 events.add(Event(it, intOf(row, CommonDataKinds.Event.DATA2) ?: DEFAULT_EVENT_TYPE))
@@ -88,6 +85,19 @@ private fun Contact.addRow(row: IntentRow) {
         }
         CommonDataKinds.Website.CONTENT_ITEM_TYPE -> {
             stringOf(row, CommonDataKinds.Website.DATA1)?.let { websites.add(it) }
+        }
+        else -> setField(row)
+    }
+}
+
+/** Applies a row that replaces a field (organization, note); other mimetypes are ignored. */
+private fun Contact.setField(row: IntentRow) {
+    when (row[CommonDataKinds.StructuredName.MIMETYPE]) {
+        CommonDataKinds.Organization.CONTENT_ITEM_TYPE -> {
+            organization = Organization(
+                stringOf(row, CommonDataKinds.Organization.DATA1) ?: "",
+                stringOf(row, CommonDataKinds.Organization.DATA4) ?: "",
+            )
         }
         CommonDataKinds.Note.CONTENT_ITEM_TYPE -> {
             stringOf(row, CommonDataKinds.Note.DATA1)?.let { notes = it }
