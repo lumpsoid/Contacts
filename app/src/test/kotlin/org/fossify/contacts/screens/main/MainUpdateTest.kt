@@ -15,6 +15,7 @@ import org.junit.Test
 
 class MainUpdateTest {
     private val all = TAB_CONTACTS or TAB_FAVORITES or TAB_GROUPS
+    private val noFavourites = TAB_CONTACTS or TAB_GROUPS
 
     private fun page(defaultTab: Int, showTabs: Int = all, lastUsed: Int = 0) =
         update(MainState(), A.PagerCreated(TabSettings(defaultTab, showTabs, lastUsed)))
@@ -29,12 +30,19 @@ class MainUpdateTest {
         actions.fold(Next<MainState, E>(from)) { next, action -> update(next.state, action) }
 
     @Test
-    fun lastUsedReopensTheStoredPageUnchecked() {
+    fun lastUsedReopensTheStoredPage() {
         val next = page(TAB_LAST_USED, lastUsed = 2)
         assertEquals(listOf(E.ShowPage(2)), next.effects)
         assertEquals(2, next.state.startPage)
 
-        assertEquals(listOf(E.ShowPage(5)), page(TAB_LAST_USED, showTabs = TAB_CONTACTS, lastUsed = 5).effects)
+        assertEquals(listOf(E.ShowPage(1)), page(TAB_LAST_USED, showTabs = noFavourites, lastUsed = 1).effects)
+    }
+
+    @Test
+    fun lastUsedPastTheShownTabsOpensTheFirstPage() {
+        assertEquals(listOf(E.ShowPage(0)), page(TAB_LAST_USED, showTabs = TAB_CONTACTS, lastUsed = 5).effects)
+        assertEquals(listOf(E.ShowPage(0)), page(TAB_LAST_USED, showTabs = noFavourites, lastUsed = 2).effects)
+        assertEquals(listOf(E.ShowPage(0)), page(TAB_LAST_USED, lastUsed = -1).effects)
     }
 
     @Test
