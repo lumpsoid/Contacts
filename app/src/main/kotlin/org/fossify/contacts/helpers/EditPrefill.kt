@@ -102,13 +102,13 @@ private fun addressOf(row: IntentRow): Address? {
         value,
         intOf(row, CommonDataKinds.StructuredPostal.DATA2) ?: DEFAULT_ADDRESS_TYPE,
         "",
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.COUNTRY)),
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.REGION)),
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.CITY)),
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.POSTCODE)),
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.POBOX)),
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.STREET)),
-        requireNotNull(stringOf(row, CommonDataKinds.StructuredPostal.NEIGHBORHOOD)),
+        stringOf(row, CommonDataKinds.StructuredPostal.COUNTRY).orEmpty(),
+        stringOf(row, CommonDataKinds.StructuredPostal.REGION).orEmpty(),
+        stringOf(row, CommonDataKinds.StructuredPostal.CITY).orEmpty(),
+        stringOf(row, CommonDataKinds.StructuredPostal.POSTCODE).orEmpty(),
+        stringOf(row, CommonDataKinds.StructuredPostal.POBOX).orEmpty(),
+        stringOf(row, CommonDataKinds.StructuredPostal.STREET).orEmpty(),
+        stringOf(row, CommonDataKinds.StructuredPostal.NEIGHBORHOOD).orEmpty(),
     )
 }
 

@@ -1,6 +1,7 @@
 package org.fossify.contacts.helpers
 
 import android.provider.ContactsContract.CommonDataKinds
+import org.fossify.commons.helpers.DEFAULT_ADDRESS_TYPE
 import org.fossify.commons.helpers.DEFAULT_EMAIL_TYPE
 import org.fossify.commons.helpers.DEFAULT_EVENT_TYPE
 import org.fossify.commons.helpers.DEFAULT_PHONE_NUMBER_TYPE
@@ -142,6 +143,20 @@ class EditPrefillTest {
             ),
             result.contact.addresses,
         )
+    }
+
+    @Test
+    fun addressRowWithOnlyItsTextIsAdded() {
+        val prefill = Prefill(
+            rows = listOf(
+                row(
+                    CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE,
+                    CommonDataKinds.StructuredPostal.DATA1 to "Main St 1",
+                ),
+            ),
+        )
+        val result = prefill.applyTo(empty, false, normalize)
+        assertEquals(listOf(Address("Main St 1", DEFAULT_ADDRESS_TYPE, "")), result.contact.addresses)
     }
 
     @Test
